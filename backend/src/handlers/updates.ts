@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getUserById, getUpdatesByProject, createUpdate } from '../lib/dynamo'
+import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate } from '../lib/dynamo'
+import type { GithubEvent } from '../types'
 import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
 import { preprocessEvents } from '../lib/preprocessing'
@@ -65,8 +66,21 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
   const project = await getProject(userId, body.projectId)
   if (!project) return err(404, 'Project not found')
 
-  // Phase 3: load rawEvents from DynamoDB, re-run generateUpdate
-  return err(501, 'Regenerate not implemented yet — Phase 3')
+  const existing = await getUpdateByProjectAndId(project.id, updateId)
+  if (!existing) return err(404, 'Update not found')
+
+  const events = JSON.parse(existing.rawEvents) as GithubEvent[]
+  const content = await generateUpdate(events)
+
+  const update = {
+    id: randomUUID(),
+    projectId: project.id,
+    content,
+    rawEvents: existing.rawEvents,
+    createdAt: new Date().toISOString(),
+  }
+  await createUpdate(update)
+  return ok({ updateId: update.id, content })
 }
 
 async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {

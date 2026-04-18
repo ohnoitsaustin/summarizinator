@@ -406,9 +406,9 @@ Returns list of past updates for a project (id, createdAt, content preview).
 
 ### Phase 2 — GitHub Integration (Day 3–4)
 
-[ ] Connect account
-[ ] Fetch PRs + issues
-[ ] Normalize events
+[x] Connect account
+[x] Fetch PRs + issues
+[x] Normalize events
 
 ### Phase 3 — LLM Generation (Day 5)
 
