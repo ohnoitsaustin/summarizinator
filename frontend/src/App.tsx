@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import AppLayout from './components/AppLayout'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 import Dashboard from './pages/Dashboard'
@@ -7,7 +8,7 @@ import ProjectPage from './pages/ProjectPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { token } = useAuth()
-  return token ? <>{children}</> : <Navigate to="/login" replace />
+  return token ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" replace />
 }
 
 export default function App() {

@@ -27,6 +27,7 @@ export type UpdateSummary = {
   id: string
   content: string
   createdAt: string
+  events: GithubEvent[]
 }
 
 export type GithubEvent = {

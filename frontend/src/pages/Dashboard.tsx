@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
 import { api, type Project } from '../api/client'
 import ProjectCard from '../components/ProjectCard'
 
 export default function Dashboard() {
-  const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -37,24 +35,8 @@ export default function Dashboard() {
     }
   }
 
-  function handleLogout() {
-    logout()
-    navigate('/login')
-  }
-
   return (
-    <div className="min-h-screen bg-brand-bg text-white">
-      <header className="border-b border-brand-mid/50 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-white">Summarizinator</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-brand-accent/70 text-sm">@{user?.githubLogin}</span>
-          <button onClick={handleLogout} className="text-sm text-brand-mid hover:text-white transition-colors">
-            Sign out
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold">Projects</h2>
           <button
@@ -125,7 +107,6 @@ export default function Dashboard() {
             ))}
           </div>
         )}
-      </main>
     </div>
   )
 }

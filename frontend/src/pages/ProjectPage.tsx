@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { api, type Project, type UpdateSummary, type GithubEvent } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
@@ -8,7 +8,6 @@ import EventList from '../components/EventList'
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
 
   const [project, setProject] = useState<Project | null>(null)
   const [updates, setUpdates] = useState<UpdateSummary[]>([])
@@ -30,6 +29,7 @@ export default function ProjectPage() {
       if (list.length > 0) {
         setActiveContent(list[0].content)
         setActiveUpdateId(list[0].id)
+        setEvents(list[0].events ?? [])
       }
     })
   }, [id])
@@ -60,7 +60,7 @@ export default function ProjectPage() {
     setHighlightedIds(new Set())
     try {
       const result = await api.updates.generate(id)
-      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString() }
+      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
@@ -83,7 +83,7 @@ export default function ProjectPage() {
         Array.from(hiddenIds),
         Array.from(highlightedIds),
       )
-      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString() }
+      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
@@ -96,21 +96,15 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-bg text-white">
-      <header className="border-b border-brand-mid/50 px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/dashboard')} className="text-brand-mid hover:text-white transition-colors">
-          ← Back
-        </button>
+    <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+      {project && (
         <div>
-          <h1 className="text-lg font-semibold">{project?.name ?? '…'}</h1>
-          {project && (
-            <p className="text-brand-accent/70 text-sm">{project.repoOwner}/{project.repoName}</p>
-          )}
+          <h2 className="text-xl font-semibold">{project.name}</h2>
+          <p className="text-brand-accent/60 text-sm">{project.repoOwner}/{project.repoName}</p>
         </div>
-      </header>
+      )}
 
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
-        {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex items-center gap-3">
           <GenerateButton onClick={handleGenerate} loading={generating} />
@@ -148,7 +142,7 @@ export default function ProjectPage() {
             {updates.slice(1).map(u => (
               <button
                 key={u.id}
-                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id); setEvents([]) }}
+                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id); setEvents(u.events ?? []); setHiddenIds(new Set()); setHighlightedIds(new Set()) }}
                 className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
               >
                 {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -156,7 +150,6 @@ export default function ProjectPage() {
             ))}
           </div>
         )}
-      </main>
     </div>
   )
 }

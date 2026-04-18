@@ -101,7 +101,12 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
   if (!project) return err(404, 'Project not found')
 
   const updates = await getUpdatesByProject(projectId)
-  return ok(updates.map(u => ({ id: u.id, content: u.content, createdAt: u.createdAt })))
+  return ok(updates.map(u => ({
+    id: u.id,
+    content: u.content,
+    createdAt: u.createdAt,
+    events: JSON.parse(u.rawEvents) as GithubEvent[],
+  })))
 }
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
