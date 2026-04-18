@@ -1,0 +1,9 @@
+{
+  "name": "summarizinator",
+  "private": true,
+  "workspaces": ["frontend", "backend", "infra"],
+  "scripts": {
+    "typecheck": "npm run typecheck -ws --if-present",
+    "build:frontend": "npm run build --workspace=frontend"
+  }
+}
