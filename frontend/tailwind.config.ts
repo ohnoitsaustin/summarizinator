@@ -6,11 +6,11 @@ export default {
     extend: {
       colors: {
         brand: {
-          bg: '#17153B',
-          surface: '#2E236C',
-          mid: '#433D8B',
-          accent: '#C8ACD6',
-          cta: '#C8ACD6',
+          bg: '#1B3C53',
+          surface: '#234C6A',
+          mid: '#456882',
+          accent: '#D2C1B6',
+          cta: '#D2C1B6',
         },
       },
     },

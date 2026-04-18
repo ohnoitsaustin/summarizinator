@@ -10,8 +10,8 @@ export default defineConfig({
       manifest: {
         name: 'Summarizinator',
         short_name: 'Summarizinator',
-        theme_color: '#17153B',
-        background_color: '#17153B',
+        theme_color: '#1B3C53',
+        background_color: '#1B3C53',
         display: 'standalone',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
