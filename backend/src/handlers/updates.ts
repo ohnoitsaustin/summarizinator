@@ -55,12 +55,16 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
     createdAt: new Date().toISOString(),
   }
   await createUpdate(update)
-  return ok({ updateId: update.id, content })
+  return ok({ updateId: update.id, content, events })
 }
 
 async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
   const updateId = event.pathParameters?.id
-  const body = JSON.parse(event.body ?? '{}') as { projectId?: string }
+  const body = JSON.parse(event.body ?? '{}') as {
+    projectId?: string
+    hiddenIds?: string[]
+    highlightedIds?: string[]
+  }
   if (!updateId || !body.projectId) return err(400, 'Missing updateId or projectId')
 
   const project = await getProject(userId, body.projectId)
@@ -69,7 +73,13 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
   const existing = await getUpdateByProjectAndId(project.id, updateId)
   if (!existing) return err(404, 'Update not found')
 
-  const events = JSON.parse(existing.rawEvents) as GithubEvent[]
+  const hiddenSet = new Set(body.hiddenIds ?? [])
+  const highlightedSet = new Set(body.highlightedIds ?? [])
+
+  const events = (JSON.parse(existing.rawEvents) as GithubEvent[])
+    .filter(e => !hiddenSet.has(e.id))
+    .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
+
   const content = await generateUpdate(events)
 
   const update = {
@@ -80,7 +90,7 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     createdAt: new Date().toISOString(),
   }
   await createUpdate(update)
-  return ok({ updateId: update.id, content })
+  return ok({ updateId: update.id, content, events })
 }
 
 async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {

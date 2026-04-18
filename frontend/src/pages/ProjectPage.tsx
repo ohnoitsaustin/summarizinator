@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { api, type Project, type UpdateSummary } from '../api/client'
+import { api, type Project, type UpdateSummary, type GithubEvent } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import CopyButton from '../components/CopyButton'
+import EventList from '../components/EventList'
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
@@ -13,6 +14,9 @@ export default function ProjectPage() {
   const [updates, setUpdates] = useState<UpdateSummary[]>([])
   const [activeContent, setActiveContent] = useState('')
   const [activeUpdateId, setActiveUpdateId] = useState<string | null>(null)
+  const [events, setEvents] = useState<GithubEvent[]>([])
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
+  const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,16 +34,37 @@ export default function ProjectPage() {
     })
   }, [id])
 
+  function toggleHide(eventId: string) {
+    setHiddenIds(prev => {
+      const next = new Set(prev)
+      if (next.has(eventId)) next.delete(eventId)
+      else { next.add(eventId); setHighlightedIds(h => { const hn = new Set(h); hn.delete(eventId); return hn }) }
+      return next
+    })
+  }
+
+  function toggleHighlight(eventId: string) {
+    setHighlightedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(eventId)) next.delete(eventId)
+      else next.add(eventId)
+      return next
+    })
+  }
+
   async function handleGenerate() {
     if (!id) return
     setGenerating(true)
     setError(null)
+    setHiddenIds(new Set())
+    setHighlightedIds(new Set())
     try {
       const result = await api.updates.generate(id)
       const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString() }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
+      setEvents(result.events)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed')
     } finally {
@@ -52,11 +77,17 @@ export default function ProjectPage() {
     setGenerating(true)
     setError(null)
     try {
-      const result = await api.updates.regenerate(activeUpdateId, id)
+      const result = await api.updates.regenerate(
+        activeUpdateId,
+        id,
+        Array.from(hiddenIds),
+        Array.from(highlightedIds),
+      )
       const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString() }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
+      setEvents(result.events)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Regeneration failed')
     } finally {
@@ -97,6 +128,16 @@ export default function ProjectPage() {
           )}
         </div>
 
+        {events.length > 0 && (
+          <EventList
+            events={events}
+            hiddenIds={hiddenIds}
+            highlightedIds={highlightedIds}
+            onToggleHide={toggleHide}
+            onToggleHighlight={toggleHighlight}
+          />
+        )}
+
         {activeContent && (
           <UpdateEditor content={activeContent} onChange={setActiveContent} />
         )}
@@ -107,7 +148,7 @@ export default function ProjectPage() {
             {updates.slice(1).map(u => (
               <button
                 key={u.id}
-                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id) }}
+                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id); setEvents([]) }}
                 className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
               >
                 {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}

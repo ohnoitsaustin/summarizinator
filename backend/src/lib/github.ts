@@ -52,12 +52,12 @@ async function fetchPRs(token: string, owner: string, repo: string, since: strin
   const events: GithubEvent[] = []
   for (const pr of open) {
     if (pr.created_at >= since) {
-      events.push({ type: 'pr_opened', title: pr.title, body: pr.body ?? undefined, author: pr.user.login, createdAt: pr.created_at, url: pr.html_url })
+      events.push({ id: pr.html_url, type: 'pr_opened', title: pr.title, body: pr.body ?? undefined, author: pr.user.login, createdAt: pr.created_at, url: pr.html_url })
     }
   }
   for (const pr of closed) {
     if (pr.merged_at && pr.merged_at >= since) {
-      events.push({ type: 'pr_merged', title: pr.title, body: pr.body ?? undefined, author: pr.user.login, createdAt: pr.merged_at, url: pr.html_url })
+      events.push({ id: pr.html_url, type: 'pr_merged', title: pr.title, body: pr.body ?? undefined, author: pr.user.login, createdAt: pr.merged_at, url: pr.html_url })
     }
   }
   return events
@@ -69,6 +69,7 @@ async function fetchIssues(token: string, owner: string, repo: string, since: st
   return issues
     .filter(i => !i.pull_request)
     .map(i => ({
+      id: i.html_url,
       type: (i.state === 'closed' ? 'issue_closed' : 'issue_opened') as GithubEvent['type'],
       title: i.title,
       body: i.body ?? undefined,
@@ -82,6 +83,7 @@ async function fetchCommits(token: string, owner: string, repo: string, since: s
   const res = await ghFetch(`/repos/${owner}/${repo}/commits?since=${since}&per_page=100`, token)
   const commits = await res.json() as GHCommit[]
   return commits.map(c => ({
+    id: c.html_url,
     type: 'commit' as const,
     title: c.commit.message.split('\n')[0],
     author: c.author?.login ?? c.commit.author.name,

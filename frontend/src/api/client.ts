@@ -29,6 +29,19 @@ export type UpdateSummary = {
   createdAt: string
 }
 
+export type GithubEvent = {
+  id: string
+  type: 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
+  title: string
+  body?: string
+  author: string
+  createdAt: string
+  url: string
+  highlighted?: boolean
+}
+
+type GenerateResult = { updateId: string; content: string; events: GithubEvent[] }
+
 export const api = {
   auth: {
     token: (code: string) =>
@@ -44,14 +57,14 @@ export const api = {
   },
   updates: {
     generate: (projectId: string, days = 7) =>
-      request<{ updateId: string; content: string }>('/api/updates/generate', {
+      request<GenerateResult>('/api/updates/generate', {
         method: 'POST',
         body: JSON.stringify({ projectId, days }),
       }),
-    regenerate: (updateId: string, projectId: string) =>
-      request<{ updateId: string; content: string }>(`/api/updates/${updateId}/regenerate`, {
+    regenerate: (updateId: string, projectId: string, hiddenIds?: string[], highlightedIds?: string[]) =>
+      request<GenerateResult>(`/api/updates/${updateId}/regenerate`, {
         method: 'POST',
-        body: JSON.stringify({ projectId }),
+        body: JSON.stringify({ projectId, hiddenIds, highlightedIds }),
       }),
     list: (projectId: string) =>
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),

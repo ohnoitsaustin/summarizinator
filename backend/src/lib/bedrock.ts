@@ -9,7 +9,12 @@ const SYSTEM_PROMPT =
   'You are a senior engineering manager writing a concise weekly update for leadership. Focus on outcomes, risks, and changes. Avoid fluff.'
 
 function buildPrompt(events: GithubEvent[]): string {
-  return `Summarize the following engineering activity into:
+  const emphasized = events.filter(e => e.highlighted)
+  const emphasisSection = emphasized.length > 0
+    ? 'EMPHASIZE these items — give them prominent placement:\n' + emphasized.map(e => `- ${e.title}`).join('\n') + '\n\n'
+    : ''
+
+  return emphasisSection + `Summarize the following engineering activity into:
 
 * Wins
 * In Progress
