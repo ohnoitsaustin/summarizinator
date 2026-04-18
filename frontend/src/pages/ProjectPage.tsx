@@ -247,24 +247,6 @@ export default function ProjectPage() {
       )}
 
       <div className="space-y-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <GenerateButton onClick={handleGenerate} loading={generating} />
-          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
-            {SPAN_OPTIONS.map(({ d, label }, i) => (
-              <button
-                key={d}
-                onClick={() => handleDaysChange(d)}
-                disabled={fetchingEvents}
-                className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {fetchingEvents && <LoadingDots className="text-brand-mid" />}
-        </div>
-
         <div className="flex items-center gap-2">
           <span className="text-xs text-brand-mid/70 shrink-0">Audience</span>
           <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
@@ -289,6 +271,24 @@ export default function ProjectPage() {
           className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-mid/40 resize-none focus:outline-none focus:border-brand-mid/60 transition-colors"
           rows={2}
         />
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <GenerateButton onClick={handleGenerate} loading={generating} />
+          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+            {SPAN_OPTIONS.map(({ d, label }, i) => (
+              <button
+                key={d}
+                onClick={() => handleDaysChange(d)}
+                disabled={fetchingEvents}
+                className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {fetchingEvents && <LoadingDots className="text-brand-mid" />}
+        </div>
       </div>
 
       {activeContent && (
