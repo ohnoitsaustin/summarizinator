@@ -7,6 +7,10 @@ import { fetchRepoEvents } from '../lib/github'
 import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
 
+function parseRawEvents(raw: string): GithubEvent[] {
+  return (JSON.parse(raw) as GithubEvent[]).map(e => ({ ...e, id: e.id ?? e.url }))
+}
+
 const ok = (body: unknown, status = 200): APIGatewayProxyResultV2 => ({
   statusCode: status,
   headers: { 'Content-Type': 'application/json' },
@@ -76,7 +80,7 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
   const hiddenSet = new Set(body.hiddenIds ?? [])
   const highlightedSet = new Set(body.highlightedIds ?? [])
 
-  const events = (JSON.parse(existing.rawEvents) as GithubEvent[])
+  const events = (parseRawEvents(existing.rawEvents))
     .filter(e => !hiddenSet.has(e.id))
     .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
 
@@ -105,7 +109,7 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
     id: u.id,
     content: u.content,
     createdAt: u.createdAt,
-    events: JSON.parse(u.rawEvents) as GithubEvent[],
+    events: parseRawEvents(u.rawEvents),
   })))
 }
 
