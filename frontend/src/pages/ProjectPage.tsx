@@ -5,6 +5,7 @@ import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
 import PastUpdateCard from '../components/PastUpdateCard'
+import LoadingDots from '../components/LoadingDots'
 
 
 export default function ProjectPage() {
@@ -223,7 +224,7 @@ export default function ProjectPage() {
             </button>
           ))}
         </div>
-        {fetchingEvents && <span className="text-xs text-brand-mid">Loading events…</span>}
+        {fetchingEvents && <LoadingDots className="text-brand-mid" />}
       </div>
 
       {activeContent && (

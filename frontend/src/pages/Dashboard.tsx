@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api, type Project } from '../api/client'
 import ProjectCard from '../components/ProjectCard'
+import LoadingDots from '../components/LoadingDots'
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -97,7 +98,7 @@ export default function Dashboard() {
         )}
 
         {loading ? (
-          <p className="text-brand-mid">Loading…</p>
+          <p className="text-brand-mid"><LoadingDots /></p>
         ) : projects.length === 0 && !showForm ? (
           <p className="text-brand-mid">No projects yet. Add one to get started.</p>
         ) : (

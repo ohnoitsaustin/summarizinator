@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import CopyButton from './CopyButton'
+import LoadingDots from './LoadingDots'
 
 type Props = {
   content: string
@@ -22,7 +23,7 @@ export default function UpdateEditor({ content, onChange, onRegenerate, regenera
               disabled={regenerating}
               className="px-3 py-1 border border-brand-mid/50 hover:border-brand-accent disabled:opacity-50 rounded text-xs transition-colors"
             >
-              {regenerating ? 'Regenerating…' : 'Regenerate'}
+              {regenerating ? <LoadingDots /> : 'Regenerate'}
             </button>
           )}
           <CopyButton text={content} />
