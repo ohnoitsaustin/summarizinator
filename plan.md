@@ -401,29 +401,29 @@ Returns list of past updates for a project (id, createdAt, content preview).
 
 ### Phase 1 — Foundation (Day 1–2)
 
-* Auth
-* Project creation
+[x] Auth
+[x] Project creation
 
 ### Phase 2 — GitHub Integration (Day 3–4)
 
-* Connect account
-* Fetch PRs + issues
-* Normalize events
+[ ] Connect account
+[ ] Fetch PRs + issues
+[ ] Normalize events
 
 ### Phase 3 — LLM Generation (Day 5)
 
-* Prompt integration
-* First usable output
+[ ] Prompt integration
+[ ] First usable output
 
 ### Phase 4 — UI + Editing (Day 6)
 
-* Editor page
-* Copy flow
+[ ] Editor page
+[ ] Copy flow
 
 ### Phase 5 — Polish + Deploy (Day 7)
 
-* Error handling
-* Loading states
+[ ] Error handling
+[ ] Loading states
 
 ---
 
