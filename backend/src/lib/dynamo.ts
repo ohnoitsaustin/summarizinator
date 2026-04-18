@@ -110,25 +110,6 @@ export async function patchUpdateContent(projectId: string, updateId: string, co
   }))
 }
 
-export async function patchUpdateRegenerated(
-  projectId: string,
-  updateId: string,
-  fields: { content: string; audience: string; generationContext?: string },
-): Promise<void> {
-  const update = await getUpdateByProjectAndId(projectId, updateId)
-  if (!update) return
-  await client.send(new UpdateCommand({
-    TableName: TABLE,
-    Key: { PK: `PROJECT#${projectId}`, SK: `UPDATE#${update.createdAt}` },
-    UpdateExpression: 'SET #content = :content, audience = :audience, generationContext = :ctx',
-    ExpressionAttributeNames: { '#content': 'content' },
-    ExpressionAttributeValues: {
-      ':content': fields.content,
-      ':audience': fields.audience,
-      ':ctx': fields.generationContext ?? null,
-    },
-  }))
-}
 
 export async function createUpdate(update: Update): Promise<void> {
   await client.send(new PutCommand({

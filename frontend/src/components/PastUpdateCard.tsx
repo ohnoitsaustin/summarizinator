@@ -18,7 +18,7 @@ export default function PastUpdateCard({ update, onSave, onDelete }: Props) {
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const undoInterval = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const dateLabel = new Date(update.createdAt).toLocaleDateString(undefined, {
+  const dateLabel = update.name || new Date(update.createdAt).toLocaleDateString(undefined, {
     month: 'short', day: 'numeric', year: 'numeric',
   })
 

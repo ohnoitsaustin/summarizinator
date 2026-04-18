@@ -13,13 +13,18 @@ const AUDIENCE_OPTIONS: { value: AudienceMode; label: string }[] = [
   { value: 'executive', label: 'Executive' },
 ]
 
+function defaultSaveName(): string {
+  const now = new Date()
+  return `${now.getMonth() + 1}/${now.getDate()} update`
+}
+
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
 
   const [project, setProject] = useState<Project | null>(null)
   const [updates, setUpdates] = useState<UpdateSummary[]>([])
   const [activeContent, setActiveContent] = useState('')
-  const [activeUpdateId, setActiveUpdateId] = useState<string | null>(null)
+  const [activeEvents, setActiveEvents] = useState<GithubEvent[]>([])
   const [allEvents, setAllEvents] = useState<GithubEvent[]>([])
   const [fetchedDays, setFetchedDays] = useState(0)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
@@ -32,6 +37,9 @@ export default function ProjectPage() {
   const [generating, setGenerating] = useState(false)
   const [fetchingEvents, setFetchingEvents] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSave, setShowSave] = useState(false)
+  const [saveName, setSaveName] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
   const events = useMemo(
@@ -48,8 +56,6 @@ export default function ProjectPage() {
       .then(list => {
         setUpdates(list)
         if (list.length > 0) {
-          setActiveContent(list[0].content)
-          setActiveUpdateId(list[0].id)
           setAudience(list[0].audience ?? 'engineering')
           setContext(list[0].generationContext ?? '')
         }
@@ -135,24 +141,24 @@ export default function ProjectPage() {
     ])
   }
 
+  function curatedEvents(): GithubEvent[] {
+    const hidden = effectiveHiddenIds()
+    const highlighted = effectiveHighlightedIds()
+    return events
+      .filter(e => !hidden.has(e.id))
+      .map(e => ({ ...e, highlighted: highlighted.has(e.id) || undefined }))
+  }
+
   async function handleGenerate() {
     if (!id) return
     setGenerating(true)
     setError(null)
+    setShowSave(false)
     resetCuration()
     try {
       const result = await api.updates.generate(id, days, audience, context.trim() || undefined)
-      const newUpdate: UpdateSummary = {
-        id: result.updateId,
-        content: result.content,
-        createdAt: new Date().toISOString(),
-        events: result.events,
-        audience: result.audience,
-        generationContext: result.generationContext,
-      }
-      setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
-      setActiveUpdateId(result.updateId)
+      setActiveEvents(result.events)
       setAllEvents(result.events)
       setFetchedDays(days)
     } catch (e) {
@@ -163,24 +169,12 @@ export default function ProjectPage() {
   }
 
   async function handleRegenerate() {
-    if (!id || !activeUpdateId) return
+    if (!id) return
     setGenerating(true)
     setError(null)
+    setShowSave(false)
     try {
-      const result = await api.updates.regenerate(
-        activeUpdateId,
-        id,
-        Array.from(effectiveHiddenIds()),
-        Array.from(effectiveHighlightedIds()),
-        days,
-        audience,
-        context.trim() || undefined,
-      )
-      setUpdates(prev => prev.map(u =>
-        u.id === result.updateId
-          ? { ...u, content: result.content, audience: result.audience, generationContext: result.generationContext }
-          : u
-      ))
+      const result = await api.updates.regenerate(id, curatedEvents(), days, audience, context.trim() || undefined)
       setActiveContent(result.content)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Regeneration failed')
@@ -189,7 +183,34 @@ export default function ProjectPage() {
     }
   }
 
-  async function handleSaveUpdate(updateId: string, content: string) {
+  function openSave() {
+    setSaveName(defaultSaveName())
+    setShowSave(true)
+  }
+
+  async function handleSave() {
+    if (!id || !project || !saveName.trim()) return
+    setSaving(true)
+    setError(null)
+    try {
+      const saved = await api.updates.save(
+        id,
+        saveName.trim(),
+        activeContent,
+        activeEvents,
+        audience,
+        context.trim() || undefined,
+      )
+      setUpdates(prev => [saved, ...prev])
+      setShowSave(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Save failed')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleEditSavedUpdate(updateId: string, content: string) {
     if (!project) return
     try {
       await api.updates.patch(updateId, project.id, content)
@@ -291,22 +312,57 @@ export default function ProjectPage() {
           </div>
 
           {activeContent && (
-            <UpdateEditor
-              content={activeContent}
-              onChange={setActiveContent}
-              onRegenerate={handleRegenerate}
-              regenerating={generating}
-            />
+            <>
+              <UpdateEditor
+                content={activeContent}
+                onChange={setActiveContent}
+                onRegenerate={handleRegenerate}
+                regenerating={generating}
+              />
+
+              {showSave ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    value={saveName}
+                    onChange={e => setSaveName(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setShowSave(false) }}
+                    className="flex-1 bg-transparent border border-brand-mid/50 rounded px-3 py-1.5 text-sm text-brand-accent placeholder-brand-mid/40 focus:outline-none focus:border-brand-mid transition-colors"
+                    placeholder="Update name"
+                  />
+                  <button
+                    onClick={handleSave}
+                    disabled={saving || !saveName.trim()}
+                    className="px-3 py-1.5 bg-brand-accent text-brand-bg text-xs font-medium rounded hover:bg-brand-accent/80 disabled:opacity-50 transition-colors"
+                  >
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => setShowSave(false)}
+                    className="px-3 py-1.5 text-brand-mid text-xs hover:text-white transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={openSave}
+                  className="text-xs text-brand-mid hover:text-brand-accent transition-colors"
+                >
+                  Save as past update
+                </button>
+              )}
+            </>
           )}
 
-          {updates.length > 1 && (
+          {updates.length > 0 && (
             <div className="space-y-2">
               <p className="text-brand-mid text-sm">Past updates</p>
-              {updates.slice(1).map(u => (
+              {updates.map(u => (
                 <PastUpdateCard
                   key={u.id}
                   update={u}
-                  onSave={handleSaveUpdate}
+                  onSave={handleEditSavedUpdate}
                   onDelete={handleDeleteUpdate}
                 />
               ))}

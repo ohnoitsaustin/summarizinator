@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate, deleteUpdate, patchUpdateContent, patchUpdateRegenerated } from '../lib/dynamo'
+import { getProject, getUserById, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
 import type { GithubEvent, AudienceMode } from '../types'
 import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
@@ -66,55 +66,69 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
   const events = preprocessEvents(rawEvents)
   const signals = analyzeRisks(events, context)
-
   const content = await generateUpdate(events, days, audience, context, signals)
 
-  const update = {
-    id: randomUUID(),
-    projectId: project.id,
-    content,
-    rawEvents: JSON.stringify(events),
-    createdAt: new Date().toISOString(),
-    audience,
-    generationContext: context,
-  }
-  await createUpdate(update)
-  return ok({ updateId: update.id, content, events, audience, generationContext: context })
+  return ok({ content, events, audience, generationContext: context })
 }
 
 async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
-  const updateId = event.pathParameters?.id
   const body = JSON.parse(event.body ?? '{}') as {
     projectId?: string
-    hiddenIds?: string[]
-    highlightedIds?: string[]
+    events?: GithubEvent[]
     days?: number
     audience?: unknown
     context?: string
   }
-  if (!updateId || !body.projectId) return err(400, 'Missing updateId or projectId')
+  if (!body.projectId || !Array.isArray(body.events)) return err(400, 'Missing projectId or events')
 
   const project = await getProject(userId, body.projectId)
   if (!project) return err(404, 'Project not found')
 
-  const existing = await getUpdateByProjectAndId(project.id, updateId)
-  if (!existing) return err(404, 'Update not found')
+  const audience = parseAudience(body.audience)
+  const context = body.context?.trim() || undefined
+  const signals = analyzeRisks(body.events, context)
+  const content = await generateUpdate(body.events, body.days ?? 7, audience, context, signals)
 
-  const hiddenSet = new Set(body.hiddenIds ?? [])
-  const highlightedSet = new Set(body.highlightedIds ?? [])
+  return ok({ content })
+}
 
-  const events = (parseRawEvents(existing.rawEvents))
-    .filter(e => !hiddenSet.has(e.id))
-    .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
+async function handleSaveUpdate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
+  const body = JSON.parse(event.body ?? '{}') as {
+    projectId?: string
+    name?: string
+    content?: string
+    rawEvents?: string
+    audience?: unknown
+    context?: string
+  }
+  if (!body.projectId || !body.name?.trim() || body.content === undefined) {
+    return err(400, 'Missing projectId, name, or content')
+  }
 
-  const audience = parseAudience(body.audience ?? existing.audience)
-  const context = body.context !== undefined ? (body.context.trim() || undefined) : existing.generationContext
-  const signals = analyzeRisks(events, context)
+  const project = await getProject(userId, body.projectId)
+  if (!project) return err(404, 'Project not found')
 
-  const content = await generateUpdate(events, body.days ?? 7, audience, context, signals)
+  const update = {
+    id: randomUUID(),
+    projectId: project.id,
+    name: body.name.trim(),
+    content: body.content,
+    rawEvents: body.rawEvents ?? '[]',
+    createdAt: new Date().toISOString(),
+    audience: parseAudience(body.audience),
+    generationContext: body.context?.trim() || undefined,
+  }
+  await createUpdate(update)
 
-  await patchUpdateRegenerated(project.id, updateId, { content, audience, generationContext: context })
-  return ok({ updateId, content, events, audience, generationContext: context })
+  return ok({
+    id: update.id,
+    name: update.name,
+    content: update.content,
+    createdAt: update.createdAt,
+    events: parseRawEvents(update.rawEvents),
+    audience: update.audience,
+    generationContext: update.generationContext,
+  })
 }
 
 async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
@@ -127,6 +141,7 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
   const updates = await getUpdatesByProject(projectId)
   return ok(updates.map(u => ({
     id: u.id,
+    name: u.name ?? '',
     content: u.content,
     createdAt: u.createdAt,
     events: parseRawEvents(u.rawEvents),
@@ -183,7 +198,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   try {
     const route = event.routeKey
     if (route === 'POST /api/updates/generate') return handleGenerate(event, user.sub)
-    if (route === 'POST /api/updates/{id}/regenerate') return handleRegenerate(event, user.sub)
+    if (route === 'POST /api/updates/regenerate') return handleRegenerate(event, user.sub)
+    if (route === 'POST /api/updates/save') return handleSaveUpdate(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, user.sub)
     if (route === 'DELETE /api/updates/{id}') return handleDeleteUpdate(event, user.sub)

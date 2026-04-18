@@ -27,6 +27,7 @@ export type AudienceMode = 'engineering' | 'product' | 'executive'
 
 export type UpdateSummary = {
   id: string
+  name: string
   content: string
   createdAt: string
   events: GithubEvent[]
@@ -46,12 +47,13 @@ export type GithubEvent = {
 }
 
 type GenerateResult = {
-  updateId: string
   content: string
   events: GithubEvent[]
   audience: AudienceMode
   generationContext?: string
 }
+
+type RegenerateResult = { content: string }
 
 export const api = {
   auth: {
@@ -72,18 +74,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ projectId, days, audience, context }),
       }),
-    regenerate: (
-      updateId: string,
-      projectId: string,
-      hiddenIds?: string[],
-      highlightedIds?: string[],
-      days?: number,
-      audience?: AudienceMode,
-      context?: string,
-    ) =>
-      request<GenerateResult>(`/api/updates/${updateId}/regenerate`, {
+    regenerate: (projectId: string, events: GithubEvent[], days: number, audience: AudienceMode, context?: string) =>
+      request<RegenerateResult>('/api/updates/regenerate', {
         method: 'POST',
-        body: JSON.stringify({ projectId, hiddenIds, highlightedIds, days, audience, context }),
+        body: JSON.stringify({ projectId, events, days, audience, context }),
+      }),
+    save: (projectId: string, name: string, content: string, rawEvents: GithubEvent[], audience: AudienceMode, context?: string) =>
+      request<UpdateSummary>('/api/updates/save', {
+        method: 'POST',
+        body: JSON.stringify({ projectId, name, content, rawEvents: JSON.stringify(rawEvents), audience, context }),
       }),
     list: (projectId: string) =>
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),

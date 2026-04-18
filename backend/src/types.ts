@@ -21,6 +21,7 @@ export type AudienceMode = 'engineering' | 'product' | 'executive'
 export type Update = {
   id: string
   projectId: string
+  name: string
   content: string
   rawEvents: string
   createdAt: string

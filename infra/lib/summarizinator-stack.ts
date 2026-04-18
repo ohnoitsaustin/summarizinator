@@ -90,7 +90,7 @@ export class SummarizinatorStack extends cdk.Stack {
     })
     table.grantReadWriteData(projectsFn)
 
-    const BEDROCK_MODEL_ID = 'us.anthropic.claude-3-haiku-20240307-v1:0'
+    const BEDROCK_MODEL_ID = 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
 
     const updatesFn = new NodejsFunction(this, 'UpdatesFn', {
       ...lambdaDefaults,
@@ -123,7 +123,8 @@ export class SummarizinatorStack extends cdk.Stack {
     api.addRoutes({ path: '/api/auth/token', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('AuthInt', authFn) })
     api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('ProjectsInt', projectsFn) })
     api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesGenerateInt', updatesFn) })
-    api.addRoutes({ path: '/api/updates/{id}/regenerate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesRegenerateInt', updatesFn) })
+    api.addRoutes({ path: '/api/updates/regenerate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesRegenerateInt', updatesFn) })
+    api.addRoutes({ path: '/api/updates/save', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesSaveInt', updatesFn) })
     api.addRoutes({ path: '/api/projects/{projectId}/updates', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectUpdatesInt', updatesFn) })
     api.addRoutes({ path: '/api/projects/{projectId}/events', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectEventsInt', updatesFn) })
     api.addRoutes({ path: '/api/updates/{id}', methods: [apigwv2.HttpMethod.DELETE, apigwv2.HttpMethod.PATCH], integration: new HttpLambdaIntegration('UpdateCrudInt', updatesFn) })
