@@ -217,97 +217,103 @@ export default function ProjectPage() {
   ]
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+    <div className="px-6 py-10 max-w-screen-xl mx-auto">
       {project && (
-        <div>
+        <div className="mb-6">
           <h2 className="text-xl font-semibold">{project.name}</h2>
           <p className="text-brand-accent/60 text-sm">{project.repoOwner}/{project.repoName}</p>
         </div>
       )}
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-red-400 text-sm mb-6">{error}</p>}
 
-      {events.length > 0 && (
-        <EventList
-          events={events}
-          hiddenIds={hiddenIds}
-          highlightedIds={highlightedIds}
-          hiddenAuthors={hiddenAuthors}
-          highlightedAuthors={highlightedAuthors}
-          onToggleHide={toggleHide}
-          onToggleHighlight={toggleHighlight}
-          onToggleHideAuthor={toggleHideAuthor}
-          onToggleHighlightAuthor={toggleHighlightAuthor}
-        />
-      )}
-
-      <div className="space-y-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-brand-mid/70 shrink-0">Audience</span>
-          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
-            {AUDIENCE_OPTIONS.map(({ value, label }, i) => (
-              <button
-                key={value}
-                onClick={() => setAudience(value)}
-                className={`px-3 py-2 transition-colors ${audience === value ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
-              >
-                {label}
-              </button>
-            ))}
+      <div className="flex flex-col lg:flex-row lg:gap-8">
+        {events.length > 0 && (
+          <div className="lg:w-1/3 shrink-0 mb-6 lg:mb-0 lg:self-start lg:sticky lg:top-6">
+            <EventList
+              events={events}
+              hiddenIds={hiddenIds}
+              highlightedIds={highlightedIds}
+              hiddenAuthors={hiddenAuthors}
+              highlightedAuthors={highlightedAuthors}
+              onToggleHide={toggleHide}
+              onToggleHighlight={toggleHighlight}
+              onToggleHideAuthor={toggleHideAuthor}
+              onToggleHighlightAuthor={toggleHighlightAuthor}
+            />
           </div>
-        </div>
+        )}
 
-        <textarea
-          value={context}
-          onChange={e => setContext(e.target.value)}
-          maxLength={1000}
-          placeholder="Additional context (optional) — release timing, staffing changes, shifted priorities, known blockers..."
-          className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-mid/40 resize-none focus:outline-none focus:border-brand-mid/60 transition-colors"
-          rows={2}
-        />
+        <div className="flex-1 min-w-0 space-y-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-brand-mid/70 shrink-0">Audience</span>
+              <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+                {AUDIENCE_OPTIONS.map(({ value, label }, i) => (
+                  <button
+                    key={value}
+                    onClick={() => setAudience(value)}
+                    className={`px-3 py-2 transition-colors ${audience === value ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                      } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <GenerateButton onClick={handleGenerate} loading={generating} />
-          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
-            {SPAN_OPTIONS.map(({ d, label }, i) => (
-              <button
-                key={d}
-                onClick={() => handleDaysChange(d)}
-                disabled={fetchingEvents}
-                className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
-              >
-                {label}
-              </button>
-            ))}
+            <textarea
+              value={context}
+              onChange={e => setContext(e.target.value)}
+              maxLength={1000}
+              placeholder="Additional context (optional) — release timing, staffing changes, shifted priorities, known blockers..."
+              className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-mid/40 resize-none focus:outline-none focus:border-brand-mid/60 transition-colors"
+              rows={2}
+            />
+
+            <div className="flex items-center gap-3 flex-wrap">
+              <GenerateButton onClick={handleGenerate} loading={generating} />
+              <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+                {SPAN_OPTIONS.map(({ d, label }, i) => (
+                  <button
+                    key={d}
+                    onClick={() => handleDaysChange(d)}
+                    disabled={fetchingEvents}
+                    className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                      } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {fetchingEvents && <LoadingDots className="text-brand-mid" />}
+            </div>
           </div>
-          {fetchingEvents && <LoadingDots className="text-brand-mid" />}
+
+          {activeContent && (
+            <UpdateEditor
+              content={activeContent}
+              onChange={setActiveContent}
+              onRegenerate={handleRegenerate}
+              regenerating={generating}
+            />
+          )}
+
+          {updates.length > 1 && (
+            <div className="space-y-2">
+              <p className="text-brand-mid text-sm">Past updates</p>
+              {updates.slice(1).map(u => (
+                <PastUpdateCard
+                  key={u.id}
+                  update={u}
+                  onSave={handleSaveUpdate}
+                  onDelete={handleDeleteUpdate}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      {activeContent && (
-        <UpdateEditor
-          content={activeContent}
-          onChange={setActiveContent}
-          onRegenerate={handleRegenerate}
-          regenerating={generating}
-        />
-      )}
-
-      {updates.length > 1 && (
-        <div className="space-y-2">
-          <p className="text-brand-mid text-sm">Past updates</p>
-          {updates.slice(1).map(u => (
-            <PastUpdateCard
-              key={u.id}
-              update={u}
-              onSave={handleSaveUpdate}
-              onDelete={handleDeleteUpdate}
-            />
-          ))}
-        </div>
-      )}
     </div>
   )
 }
