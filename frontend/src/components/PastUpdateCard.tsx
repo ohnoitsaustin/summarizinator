@@ -3,14 +3,13 @@ import type { UpdateSummary } from '../api/client'
 
 type Props = {
   update: UpdateSummary
-  projectId: string
   onSave: (id: string, content: string) => void
   onDelete: (id: string) => void
 }
 
 const UNDO_MS = 5000
 
-export default function PastUpdateCard({ update, projectId, onSave, onDelete }: Props) {
+export default function PastUpdateCard({ update, onSave, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editContent, setEditContent] = useState(update.content)

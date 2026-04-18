@@ -242,7 +242,6 @@ export default function ProjectPage() {
             <PastUpdateCard
               key={u.id}
               update={u}
-              projectId={project?.id ?? ''}
               onSave={handleSaveUpdate}
               onDelete={handleDeleteUpdate}
             />
