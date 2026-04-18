@@ -1,3 +1,4 @@
+import { useRef, useEffect } from 'react'
 import type { GithubEvent } from '../api/client'
 
 const TYPE_LABELS: Record<GithubEvent['type'], string> = {
@@ -14,6 +15,13 @@ const TYPE_COLORS: Record<GithubEvent['type'], string> = {
   issue_closed: 'bg-brand-mid/60 text-brand-accent',
   issue_opened: 'bg-yellow-900/60 text-yellow-300',
   commit: 'bg-brand-surface text-brand-accent/70',
+}
+
+type DragState = {
+  action: 'hide' | 'highlight'
+  targetState: boolean
+  processed: Set<string>
+  virtualState: Set<string>
 }
 
 type Props = {
@@ -39,10 +47,41 @@ export default function EventList({
   onToggleHideAuthor,
   onToggleHighlightAuthor,
 }: Props) {
+  const dragRef = useRef<DragState | null>(null)
   const authors = Array.from(new Set(events.map(e => e.author)))
 
+  useEffect(() => {
+    const stop = () => { dragRef.current = null }
+    window.addEventListener('mouseup', stop)
+    return () => window.removeEventListener('mouseup', stop)
+  }, [])
+
+  function startDrag(eventId: string, action: 'hide' | 'highlight', e: React.MouseEvent) {
+    e.preventDefault()
+    const source = action === 'hide' ? hiddenIds : highlightedIds
+    const currentlyActive = source.has(eventId)
+    const targetState = !currentlyActive
+    const virtualState = new Set(source)
+    virtualState[targetState ? 'add' : 'delete'](eventId)
+    dragRef.current = { action, targetState, processed: new Set([eventId]), virtualState }
+    if (action === 'hide') onToggleHide(eventId)
+    else onToggleHighlight(eventId)
+  }
+
+  function enterDrag(eventId: string, action: 'hide' | 'highlight') {
+    const drag = dragRef.current
+    if (!drag || drag.action !== action || drag.processed.has(eventId)) return
+    drag.processed.add(eventId)
+    const isActive = drag.virtualState.has(eventId)
+    if (isActive !== drag.targetState) {
+      drag.virtualState[drag.targetState ? 'add' : 'delete'](eventId)
+      if (action === 'hide') onToggleHide(eventId)
+      else onToggleHighlight(eventId)
+    }
+  }
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 select-none">
       {/* Author filter bar */}
       <div className="flex flex-wrap gap-2">
         {authors.map(author => {
@@ -126,20 +165,22 @@ export default function EventList({
               </a>
               <span className="shrink-0 text-xs text-brand-mid">@{event.author}</span>
               <button
-                onClick={() => onToggleHighlight(event.id)}
+                onMouseDown={e => { if (!authorHidden && !hiddenIds.has(event.id)) startDrag(event.id, 'highlight', e) }}
+                onMouseEnter={() => enterDrag(event.id, 'highlight')}
                 disabled={authorHidden || hiddenIds.has(event.id)}
                 title={highlightedIds.has(event.id) ? 'Remove emphasis' : 'Emphasize'}
-                className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 ${
+                className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${
                   highlightedIds.has(event.id) ? 'text-yellow-400' : 'text-brand-mid hover:text-yellow-400'
                 }`}
               >
                 ★
               </button>
               <button
-                onClick={() => onToggleHide(event.id)}
+                onMouseDown={e => { if (!authorHidden) startDrag(event.id, 'hide', e) }}
+                onMouseEnter={() => enterDrag(event.id, 'hide')}
                 disabled={authorHidden}
                 title={hiddenIds.has(event.id) ? 'Show' : 'Hide'}
-                className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 ${
+                className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${
                   hiddenIds.has(event.id) ? 'text-brand-mid hover:text-brand-accent' : 'text-brand-mid hover:text-red-400'
                 }`}
               >

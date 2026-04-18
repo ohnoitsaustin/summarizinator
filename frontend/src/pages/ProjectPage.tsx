@@ -5,11 +5,6 @@ import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
 
-function inferFetchedDays(events: GithubEvent[]): number {
-  if (events.length === 0) return 0
-  const oldest = Math.min(...events.map(e => new Date(e.createdAt).getTime()))
-  return Math.ceil((Date.now() - oldest) / (24 * 60 * 60 * 1000))
-}
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
@@ -43,11 +38,13 @@ export default function ProjectPage() {
       if (list.length > 0) {
         setActiveContent(list[0].content)
         setActiveUpdateId(list[0].id)
-        const loaded = list[0].events ?? []
-        setAllEvents(loaded)
-        setFetchedDays(inferFetchedDays(loaded))
       }
     })
+    setFetchingEvents(true)
+    api.updates.fetchEvents(id, days).then(res => {
+      setAllEvents(res.events)
+      setFetchedDays(res.days)
+    }).catch(() => {}).finally(() => setFetchingEvents(false))
   }, [id])
 
   async function handleDaysChange(newDays: number) {
@@ -234,9 +231,6 @@ export default function ProjectPage() {
               onClick={() => {
                 setActiveContent(u.content)
                 setActiveUpdateId(u.id)
-                const loaded = u.events ?? []
-                setAllEvents(loaded)
-                setFetchedDays(inferFetchedDays(loaded))
                 resetCuration()
               }}
               className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
