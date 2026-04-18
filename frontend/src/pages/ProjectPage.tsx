@@ -176,17 +176,12 @@ export default function ProjectPage() {
         audience,
         context.trim() || undefined,
       )
-      const newUpdate: UpdateSummary = {
-        id: result.updateId,
-        content: result.content,
-        createdAt: new Date().toISOString(),
-        events: result.events,
-        audience: result.audience,
-        generationContext: result.generationContext,
-      }
-      setUpdates(prev => [newUpdate, ...prev])
+      setUpdates(prev => prev.map(u =>
+        u.id === result.updateId
+          ? { ...u, content: result.content, audience: result.audience, generationContext: result.generationContext }
+          : u
+      ))
       setActiveContent(result.content)
-      setActiveUpdateId(result.updateId)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Regeneration failed')
     } finally {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
+import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate, deleteUpdate, patchUpdateContent, patchUpdateRegenerated } from '../lib/dynamo'
 import type { GithubEvent, AudienceMode } from '../types'
 import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
@@ -113,17 +113,8 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
 
   const content = await generateUpdate(events, body.days ?? 7, audience, context, signals)
 
-  const update = {
-    id: randomUUID(),
-    projectId: project.id,
-    content,
-    rawEvents: existing.rawEvents,
-    createdAt: new Date().toISOString(),
-    audience,
-    generationContext: context,
-  }
-  await createUpdate(update)
-  return ok({ updateId: update.id, content, events, audience, generationContext: context })
+  await patchUpdateRegenerated(project.id, updateId, { content, audience, generationContext: context })
+  return ok({ updateId, content, events, audience, generationContext: context })
 }
 
 async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
