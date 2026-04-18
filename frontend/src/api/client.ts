@@ -71,5 +71,15 @@ export const api = {
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),
     fetchEvents: (projectId: string, days: number) =>
       request<{ events: GithubEvent[]; days: number }>(`/api/projects/${projectId}/events?days=${days}`),
+    delete: (updateId: string, projectId: string) =>
+      request<{ deleted: boolean }>(`/api/updates/${updateId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ projectId }),
+      }),
+    patch: (updateId: string, projectId: string, content: string) =>
+      request<{ updated: boolean }>(`/api/updates/${updateId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ projectId, content }),
+      }),
   },
 }

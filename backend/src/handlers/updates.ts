@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate } from '../lib/dynamo'
+import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
 import type { GithubEvent } from '../types'
 import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
@@ -113,6 +113,30 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
   })))
 }
 
+async function handleDeleteUpdate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
+  const updateId = event.pathParameters?.id
+  const body = JSON.parse(event.body ?? '{}') as { projectId?: string }
+  if (!updateId || !body.projectId) return err(400, 'Missing updateId or projectId')
+
+  const project = await getProject(userId, body.projectId)
+  if (!project) return err(404, 'Project not found')
+
+  await deleteUpdate(project.id, updateId)
+  return ok({ deleted: true })
+}
+
+async function handlePatchUpdate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
+  const updateId = event.pathParameters?.id
+  const body = JSON.parse(event.body ?? '{}') as { projectId?: string; content?: string }
+  if (!updateId || !body.projectId || body.content === undefined) return err(400, 'Missing fields')
+
+  const project = await getProject(userId, body.projectId)
+  if (!project) return err(404, 'Project not found')
+
+  await patchUpdateContent(project.id, updateId, body.content)
+  return ok({ updated: true })
+}
+
 async function handleFetchEvents(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
   const projectId = event.pathParameters?.projectId
   const days = parseInt(event.queryStringParameters?.days ?? '7', 10)
@@ -140,6 +164,8 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     if (route === 'POST /api/updates/{id}/regenerate') return handleRegenerate(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, user.sub)
+    if (route === 'DELETE /api/updates/{id}') return handleDeleteUpdate(event, user.sub)
+    if (route === 'PATCH /api/updates/{id}') return handlePatchUpdate(event, user.sub)
     return err(404, 'Not found')
   } catch (e) {
     console.error(e)

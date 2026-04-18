@@ -1,5 +1,5 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from '@aws-sdk/lib-dynamodb'
+import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
 import type { User, Project, Update } from '../types'
 
 const TABLE = process.env.DYNAMODB_TABLE_NAME!
@@ -87,6 +87,27 @@ export async function getUpdateByProjectAndId(projectId: string, updateId: strin
     },
   }))
   return res.Items?.[0] ? (res.Items[0] as Update) : null
+}
+
+export async function deleteUpdate(projectId: string, updateId: string): Promise<void> {
+  const update = await getUpdateByProjectAndId(projectId, updateId)
+  if (!update) return
+  await client.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: { PK: `PROJECT#${projectId}`, SK: `UPDATE#${update.createdAt}` },
+  }))
+}
+
+export async function patchUpdateContent(projectId: string, updateId: string, content: string): Promise<void> {
+  const update = await getUpdateByProjectAndId(projectId, updateId)
+  if (!update) return
+  await client.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: { PK: `PROJECT#${projectId}`, SK: `UPDATE#${update.createdAt}` },
+    UpdateExpression: 'SET #content = :content',
+    ExpressionAttributeNames: { '#content': 'content' },
+    ExpressionAttributeValues: { ':content': content },
+  }))
 }
 
 export async function createUpdate(update: Update): Promise<void> {

@@ -4,6 +4,7 @@ import { api, type Project, type UpdateSummary, type GithubEvent } from '../api/
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
+import PastUpdateCard from '../components/PastUpdateCard'
 
 
 export default function ProjectPage() {
@@ -163,6 +164,18 @@ export default function ProjectPage() {
     }
   }
 
+  async function handleSaveUpdate(updateId: string, content: string) {
+    if (!project) return
+    await api.updates.patch(updateId, project.id, content).catch(() => {})
+    setUpdates(prev => prev.map(u => u.id === updateId ? { ...u, content } : u))
+  }
+
+  async function handleDeleteUpdate(updateId: string) {
+    if (!project) return
+    await api.updates.delete(updateId, project.id).catch(() => {})
+    setUpdates(prev => prev.filter(u => u.id !== updateId))
+  }
+
   const SPAN_OPTIONS = [
     { d: 7, label: 'Weekly' },
     { d: 14, label: 'Bi-Weekly' },
@@ -226,17 +239,13 @@ export default function ProjectPage() {
         <div className="space-y-2">
           <p className="text-brand-mid text-sm">Past updates</p>
           {updates.slice(1).map(u => (
-            <button
+            <PastUpdateCard
               key={u.id}
-              onClick={() => {
-                setActiveContent(u.content)
-                setActiveUpdateId(u.id)
-                resetCuration()
-              }}
-              className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
-            >
-              {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-            </button>
+              update={u}
+              projectId={project?.id ?? ''}
+              onSave={handleSaveUpdate}
+              onDelete={handleDeleteUpdate}
+            />
           ))}
         </div>
       )}
