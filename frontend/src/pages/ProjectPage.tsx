@@ -184,25 +184,6 @@ export default function ProjectPage() {
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <GenerateButton onClick={handleGenerate} loading={generating} />
-        <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
-          {SPAN_OPTIONS.map(({ d, label }, i) => (
-            <button
-              key={d}
-              onClick={() => handleDaysChange(d)}
-              disabled={fetchingEvents}
-              className={`px-3 py-2 transition-colors disabled:opacity-50 ${
-                days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-              } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {fetchingEvents && <span className="text-xs text-brand-mid">Loading events…</span>}
-      </div>
-
       {events.length > 0 && (
         <EventList
           events={events}
@@ -216,6 +197,24 @@ export default function ProjectPage() {
           onToggleHighlightAuthor={toggleHighlightAuthor}
         />
       )}
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <GenerateButton onClick={handleGenerate} loading={generating} />
+        <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+          {SPAN_OPTIONS.map(({ d, label }, i) => (
+            <button
+              key={d}
+              onClick={() => handleDaysChange(d)}
+              disabled={fetchingEvents}
+              className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {fetchingEvents && <span className="text-xs text-brand-mid">Loading events…</span>}
+      </div>
 
       {activeContent && (
         <UpdateEditor
