@@ -422,8 +422,8 @@ Returns list of past updates for a project (id, createdAt, content preview).
 
 ### Phase 5 — Polish + Deploy (Day 7)
 
-[ ] Error handling
-[ ] Loading states
+[x] Error handling
+[x] Loading states
 
 ---
 
