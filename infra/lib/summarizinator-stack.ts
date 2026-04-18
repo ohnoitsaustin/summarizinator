@@ -87,10 +87,8 @@ export class SummarizinatorStack extends cdk.Stack {
     table.grantReadWriteData(updatesFn)
     updatesFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
-      actions: ['bedrock:InvokeModel'],
-      resources: [
-        `arn:aws:bedrock:${this.region}:${this.account}:inference-profile/global.anthropic.claude-haiku-4-5-20251001-v1:0`
-      ],
+      actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
+      resources: ['*'],
     }))
 
     const api = new apigwv2.HttpApi(this, 'Api', {
