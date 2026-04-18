@@ -62,12 +62,14 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ projectId, days }),
       }),
-    regenerate: (updateId: string, projectId: string, hiddenIds?: string[], highlightedIds?: string[]) =>
+    regenerate: (updateId: string, projectId: string, hiddenIds?: string[], highlightedIds?: string[], days?: number) =>
       request<GenerateResult>(`/api/updates/${updateId}/regenerate`, {
         method: 'POST',
-        body: JSON.stringify({ projectId, hiddenIds, highlightedIds }),
+        body: JSON.stringify({ projectId, hiddenIds, highlightedIds, days }),
       }),
     list: (projectId: string) =>
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),
+    fetchEvents: (projectId: string, days: number) =>
+      request<{ events: GithubEvent[]; days: number }>(`/api/projects/${projectId}/events?days=${days}`),
   },
 }

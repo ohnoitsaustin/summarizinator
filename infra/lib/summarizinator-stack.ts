@@ -130,6 +130,11 @@ export class SummarizinatorStack extends cdk.Stack {
       methods: [apigwv2.HttpMethod.GET],
       integration: new HttpLambdaIntegration('ProjectUpdatesInt', updatesFn),
     })
+    api.addRoutes({
+      path: '/api/projects/{projectId}/events',
+      methods: [apigwv2.HttpMethod.GET],
+      integration: new HttpLambdaIntegration('ProjectEventsInt', updatesFn),
+    })
 
     const siteBucket = new s3.Bucket(this, 'SiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,

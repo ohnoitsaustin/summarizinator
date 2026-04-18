@@ -5,16 +5,20 @@ import { postprocessContent } from './postprocessing'
 const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.anthropic.claude-3-haiku-20240307-v1:0'
 const client = new BedrockRuntimeClient({})
 
-const SYSTEM_PROMPT =
-  'You are a senior engineering manager writing a concise weekly update for leadership. Focus on outcomes, risks, and changes. Avoid fluff.'
+function periodLabel(days: number): string {
+  if (days <= 7) return 'Weekly'
+  if (days <= 14) return 'Bi-Weekly'
+  if (days <= 31) return 'Monthly'
+  return 'Quarterly'
+}
 
-function buildPrompt(events: GithubEvent[]): string {
+function buildPrompt(events: GithubEvent[], label: string): string {
   const emphasized = events.filter(e => e.highlighted)
   const emphasisSection = emphasized.length > 0
     ? 'EMPHASIZE these items — give them prominent placement:\n' + emphasized.map(e => `- ${e.title}`).join('\n') + '\n\n'
     : ''
 
-  return emphasisSection + `Summarize the following engineering activity into:
+  return emphasisSection + `Summarize the following engineering activity into a ${label} update:
 
 * Wins
 * In Progress
@@ -30,7 +34,7 @@ Rules:
 * Avoid generic phrases like "worked on" or "continued work"
 
 Output format (use exactly these headers):
-## Weekly Update
+## ${label} Update
 
 ### Wins
 - ...
@@ -50,7 +54,9 @@ ${JSON.stringify(events, null, 2)}`
 
 type BedrockResponse = { content: { type: string; text: string }[] }
 
-export async function generateUpdate(events: GithubEvent[]): Promise<string> {
+export async function generateUpdate(events: GithubEvent[], days: number): Promise<string> {
+  const label = periodLabel(days)
+  const systemPrompt = `You are a senior engineering manager writing a concise ${label.toLowerCase()} update for leadership. Focus on outcomes, risks, and changes. Avoid fluff.`
   const command = new InvokeModelCommand({
     modelId: MODEL_ID,
     contentType: 'application/json',
@@ -58,8 +64,8 @@ export async function generateUpdate(events: GithubEvent[]): Promise<string> {
     body: JSON.stringify({
       anthropic_version: 'bedrock-2023-05-31',
       max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: buildPrompt(events) }],
+      system: systemPrompt,
+      messages: [{ role: 'user', content: buildPrompt(events, label) }],
     }),
   })
 

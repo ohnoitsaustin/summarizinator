@@ -48,8 +48,7 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
   const events = preprocessEvents(rawEvents)
 
-  // Phase 3: generateUpdate will call Bedrock — replace placeholder then
-  const content = await generateUpdate(events)
+  const content = await generateUpdate(events, days)
 
   const update = {
     id: randomUUID(),
@@ -68,6 +67,7 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     projectId?: string
     hiddenIds?: string[]
     highlightedIds?: string[]
+    days?: number
   }
   if (!updateId || !body.projectId) return err(400, 'Missing updateId or projectId')
 
@@ -84,7 +84,7 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     .filter(e => !hiddenSet.has(e.id))
     .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
 
-  const content = await generateUpdate(events)
+  const content = await generateUpdate(events, body.days ?? 7)
 
   const update = {
     id: randomUUID(),
@@ -113,6 +113,23 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
   })))
 }
 
+async function handleFetchEvents(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
+  const projectId = event.pathParameters?.projectId
+  const days = parseInt(event.queryStringParameters?.days ?? '7', 10)
+  if (!projectId) return err(400, 'Missing projectId')
+
+  const [project, user] = await Promise.all([
+    getProject(userId, projectId),
+    getUserById(userId),
+  ])
+  if (!project) return err(404, 'Project not found')
+  if (!user) return err(404, 'User not found')
+
+  const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
+  const events = preprocessEvents(rawEvents)
+  return ok({ events, days })
+}
+
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
   const user = getUser(event)
   if (!user) return err(401, 'Unauthorized')
@@ -122,6 +139,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     if (route === 'POST /api/updates/generate') return handleGenerate(event, user.sub)
     if (route === 'POST /api/updates/{id}/regenerate') return handleRegenerate(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, user.sub)
+    if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, user.sub)
     return err(404, 'Not found')
   } catch (e) {
     console.error(e)
