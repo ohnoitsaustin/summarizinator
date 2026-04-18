@@ -8,10 +8,10 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Upward Status Generator',
+        name: 'Summarizinator',
         short_name: 'Summarizinator',
-        theme_color: '#0f172a',
-        background_color: '#0f172a',
+        theme_color: '#090040',
+        background_color: '#090040',
         display: 'standalone',
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },

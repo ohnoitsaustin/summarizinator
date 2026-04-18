@@ -22,15 +22,15 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+    <div className="min-h-screen bg-brand-bg flex items-center justify-center">
       <div className="text-center space-y-6 max-w-md px-4">
-        <h1 className="text-4xl font-bold text-white">Upward Status Generator</h1>
-        <p className="text-slate-400 text-lg">
+        <h1 className="text-4xl font-bold text-white">Summarizinator</h1>
+        <p className="text-brand-accent/70 text-lg">
           Turn GitHub activity into executive-ready weekly updates in 30 seconds.
         </p>
         <button
           onClick={handleLogin}
-          className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-white text-slate-900 rounded-lg font-semibold hover:bg-slate-100 transition-colors"
+          className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-brand-cta text-brand-bg rounded-lg font-semibold hover:bg-brand-cta/90 transition-colors"
         >
           <GitHubIcon />
           Continue with GitHub

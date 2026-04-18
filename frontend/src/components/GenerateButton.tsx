@@ -3,7 +3,7 @@ export default function GenerateButton({ onClick, loading }: { onClick: () => vo
     <button
       onClick={onClick}
       disabled={loading}
-      className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-lg font-medium transition-colors"
+      className="px-6 py-2 bg-brand-cta text-brand-bg hover:bg-brand-cta/90 disabled:opacity-50 rounded-lg font-semibold transition-colors"
     >
       {loading ? 'Generating…' : 'Generate Update'}
     </button>

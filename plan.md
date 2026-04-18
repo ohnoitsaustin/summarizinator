@@ -1,4 +1,4 @@
-# Upward Status Generator — Build Plan
+# Summarizinator — Build Plan
 
 ## TL;DR
 

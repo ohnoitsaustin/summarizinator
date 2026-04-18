@@ -19,8 +19,7 @@ export default function ProjectPage() {
   useEffect(() => {
     if (!id) return
     api.projects.list().then(projects => {
-      const found = projects.find(p => p.id === id) ?? null
-      setProject(found)
+      setProject(projects.find(p => p.id === id) ?? null)
     })
     api.updates.list(id).then(list => {
       setUpdates(list)
@@ -66,15 +65,15 @@ export default function ProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/dashboard')} className="text-slate-500 hover:text-white transition-colors">
+    <div className="min-h-screen bg-brand-bg text-white">
+      <header className="border-b border-brand-mid/50 px-6 py-4 flex items-center gap-4">
+        <button onClick={() => navigate('/dashboard')} className="text-brand-mid hover:text-white transition-colors">
           ← Back
         </button>
         <div>
           <h1 className="text-lg font-semibold">{project?.name ?? '…'}</h1>
           {project && (
-            <p className="text-slate-500 text-sm">{project.repoOwner}/{project.repoName}</p>
+            <p className="text-brand-accent/70 text-sm">{project.repoOwner}/{project.repoName}</p>
           )}
         </div>
       </header>
@@ -89,7 +88,7 @@ export default function ProjectPage() {
               <button
                 onClick={handleRegenerate}
                 disabled={generating}
-                className="px-4 py-2 border border-slate-700 hover:border-slate-500 disabled:opacity-50 rounded-lg text-sm transition-colors"
+                className="px-4 py-2 border border-brand-mid/50 hover:border-brand-accent disabled:opacity-50 rounded-lg text-sm transition-colors"
               >
                 Regenerate
               </button>
@@ -104,12 +103,12 @@ export default function ProjectPage() {
 
         {updates.length > 1 && (
           <div className="space-y-2">
-            <p className="text-slate-500 text-sm">Past updates</p>
+            <p className="text-brand-mid text-sm">Past updates</p>
             {updates.slice(1).map(u => (
               <button
                 key={u.id}
                 onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id) }}
-                className="w-full text-left px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-sm text-slate-400 transition-colors"
+                className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
               >
                 {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
               </button>

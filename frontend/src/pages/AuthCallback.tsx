@@ -28,8 +28,8 @@ export default function AuthCallback() {
   }, [login, navigate])
 
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-      <p className="text-slate-400">Signing you in…</p>
+    <div className="min-h-screen bg-brand-bg flex items-center justify-center">
+      <p className="text-brand-accent/70">Signing you in…</p>
     </div>
   )
 }
