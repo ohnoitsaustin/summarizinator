@@ -74,7 +74,7 @@ export class SummarizinatorStack extends cdk.Stack {
     })
     table.grantReadWriteData(projectsFn)
 
-    const BEDROCK_MODEL_ID = 'anthropic.claude-sonnet-4-5'
+    const BEDROCK_MODEL_ID = 'anthropic.claude-sonnet-4-6'
 
     const updatesFn = new NodejsFunction(this, 'UpdatesFn', {
       ...lambdaDefaults,
