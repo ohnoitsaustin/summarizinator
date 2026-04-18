@@ -28,8 +28,8 @@ type GHCommit = {
   author: { login: string } | null
 }
 
-function ghFetch(path: string, token: string) {
-  return fetch(`${BASE}${path}`, {
+async function ghFetch(path: string, token: string) {
+  const res = await fetch(`${BASE}${path}`, {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: 'application/vnd.github+json',
@@ -37,6 +37,8 @@ function ghFetch(path: string, token: string) {
       'User-Agent': 'summarizinator',
     },
   })
+  if (!res.ok) throw new Error(`GitHub API error ${res.status} for ${path}`)
+  return res
 }
 
 async function fetchPRs(token: string, owner: string, repo: string, since: string): Promise<GithubEvent[]> {

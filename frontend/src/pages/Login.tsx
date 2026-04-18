@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string
@@ -7,6 +7,8 @@ const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID as string
 export default function Login() {
   const { token } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const authError = (location.state as { error?: string } | null)?.error
 
   useEffect(() => {
     if (token) navigate('/dashboard', { replace: true })
@@ -28,6 +30,9 @@ export default function Login() {
         <p className="text-brand-accent/70 text-lg">
           Turn GitHub activity into executive-ready weekly updates in 30 seconds.
         </p>
+        {authError && (
+          <p className="text-red-400 text-sm">{authError}</p>
+        )}
         <button
           onClick={handleLogin}
           className="w-full flex items-center justify-center gap-3 px-6 py-3 bg-brand-cta text-brand-bg rounded-lg font-semibold hover:bg-brand-cta/90 transition-colors"

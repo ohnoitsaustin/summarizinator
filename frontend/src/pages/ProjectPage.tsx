@@ -34,19 +34,23 @@ export default function ProjectPage() {
 
   useEffect(() => {
     if (!id) return
-    api.projects.list().then(projects => setProject(projects.find(p => p.id === id) ?? null))
-    api.updates.list(id).then(list => {
-      setUpdates(list)
-      if (list.length > 0) {
-        setActiveContent(list[0].content)
-        setActiveUpdateId(list[0].id)
-      }
-    })
+    api.projects.list()
+      .then(projects => setProject(projects.find(p => p.id === id) ?? null))
+      .catch(() => setError('Failed to load project'))
+    api.updates.list(id)
+      .then(list => {
+        setUpdates(list)
+        if (list.length > 0) {
+          setActiveContent(list[0].content)
+          setActiveUpdateId(list[0].id)
+        }
+      })
+      .catch(() => setError('Failed to load updates'))
     setFetchingEvents(true)
-    api.updates.fetchEvents(id, days).then(res => {
-      setAllEvents(res.events)
-      setFetchedDays(res.days)
-    }).catch(() => {}).finally(() => setFetchingEvents(false))
+    api.updates.fetchEvents(id, days)
+      .then(res => { setAllEvents(res.events); setFetchedDays(res.days) })
+      .catch(() => setError('Failed to load events'))
+      .finally(() => setFetchingEvents(false))
   }, [id])
 
   async function handleDaysChange(newDays: number) {
@@ -58,7 +62,7 @@ export default function ProjectPage() {
       setAllEvents(res.events)
       setFetchedDays(newDays)
     } catch {
-      // keep existing events on error
+      setError('Failed to load events for the selected range')
     } finally {
       setFetchingEvents(false)
     }
@@ -167,14 +171,22 @@ export default function ProjectPage() {
 
   async function handleSaveUpdate(updateId: string, content: string) {
     if (!project) return
-    await api.updates.patch(updateId, project.id, content).catch(() => {})
-    setUpdates(prev => prev.map(u => u.id === updateId ? { ...u, content } : u))
+    try {
+      await api.updates.patch(updateId, project.id, content)
+      setUpdates(prev => prev.map(u => u.id === updateId ? { ...u, content } : u))
+    } catch {
+      setError('Failed to save update')
+    }
   }
 
   async function handleDeleteUpdate(updateId: string) {
     if (!project) return
-    await api.updates.delete(updateId, project.id).catch(() => {})
-    setUpdates(prev => prev.filter(u => u.id !== updateId))
+    try {
+      await api.updates.delete(updateId, project.id)
+      setUpdates(prev => prev.filter(u => u.id !== updateId))
+    } catch {
+      setError('Failed to delete update')
+    }
   }
 
   const SPAN_OPTIONS = [

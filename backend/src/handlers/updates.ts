@@ -8,7 +8,11 @@ import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
 
 function parseRawEvents(raw: string): GithubEvent[] {
-  return (JSON.parse(raw) as GithubEvent[]).map(e => ({ ...e, id: e.id ?? e.url }))
+  try {
+    return (JSON.parse(raw) as GithubEvent[]).map(e => ({ ...e, id: e.id ?? e.url }))
+  } catch {
+    return []
+  }
 }
 
 const ok = (body: unknown, status = 200): APIGatewayProxyResultV2 => ({

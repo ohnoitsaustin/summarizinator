@@ -24,7 +24,7 @@ export default function AuthCallback() {
         login(token, user)
         navigate('/dashboard', { replace: true })
       })
-      .catch(() => navigate('/login', { replace: true }))
+      .catch(() => navigate('/login', { replace: true, state: { error: 'GitHub sign-in failed. Please try again.' } }))
   }, [login, navigate])
 
   return (
