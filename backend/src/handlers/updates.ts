@@ -1,11 +1,12 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 import { getProject, getUserById, getUpdatesByProject, getUpdateByProjectAndId, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
-import type { GithubEvent } from '../types'
+import type { GithubEvent, AudienceMode } from '../types'
 import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
 import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
+import { analyzeRisks } from '../lib/riskAnalysis'
 
 function parseRawEvents(raw: string): GithubEvent[] {
   try {
@@ -37,8 +38,18 @@ function getUser(event: APIGatewayProxyEventV2) {
   }
 }
 
+function parseAudience(value: unknown): AudienceMode {
+  if (value === 'product' || value === 'executive') return value
+  return 'engineering'
+}
+
 async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
-  const body = JSON.parse(event.body ?? '{}') as { projectId?: string; days?: number }
+  const body = JSON.parse(event.body ?? '{}') as {
+    projectId?: string
+    days?: number
+    audience?: unknown
+    context?: string
+  }
   if (!body.projectId) return err(400, 'Missing projectId')
 
   const [project, user] = await Promise.all([
@@ -49,10 +60,14 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   if (!user) return err(404, 'User not found')
 
   const days = body.days ?? 7
+  const audience = parseAudience(body.audience)
+  const context = body.context?.trim() || undefined
+
   const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
   const events = preprocessEvents(rawEvents)
+  const signals = analyzeRisks(events, context)
 
-  const content = await generateUpdate(events, days)
+  const content = await generateUpdate(events, days, audience, context, signals)
 
   const update = {
     id: randomUUID(),
@@ -60,9 +75,11 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
     content,
     rawEvents: JSON.stringify(events),
     createdAt: new Date().toISOString(),
+    audience,
+    generationContext: context,
   }
   await createUpdate(update)
-  return ok({ updateId: update.id, content, events })
+  return ok({ updateId: update.id, content, events, audience, generationContext: context })
 }
 
 async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
@@ -72,6 +89,8 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     hiddenIds?: string[]
     highlightedIds?: string[]
     days?: number
+    audience?: unknown
+    context?: string
   }
   if (!updateId || !body.projectId) return err(400, 'Missing updateId or projectId')
 
@@ -88,7 +107,11 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     .filter(e => !hiddenSet.has(e.id))
     .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
 
-  const content = await generateUpdate(events, body.days ?? 7)
+  const audience = parseAudience(body.audience ?? existing.audience)
+  const context = body.context !== undefined ? (body.context.trim() || undefined) : existing.generationContext
+  const signals = analyzeRisks(events, context)
+
+  const content = await generateUpdate(events, body.days ?? 7, audience, context, signals)
 
   const update = {
     id: randomUUID(),
@@ -96,9 +119,11 @@ async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): 
     content,
     rawEvents: existing.rawEvents,
     createdAt: new Date().toISOString(),
+    audience,
+    generationContext: context,
   }
   await createUpdate(update)
-  return ok({ updateId: update.id, content, events })
+  return ok({ updateId: update.id, content, events, audience, generationContext: context })
 }
 
 async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
@@ -114,6 +139,8 @@ async function handleListUpdates(event: APIGatewayProxyEventV2, userId: string):
     content: u.content,
     createdAt: u.createdAt,
     events: parseRawEvents(u.rawEvents),
+    audience: u.audience ?? 'engineering',
+    generationContext: u.generationContext,
   })))
 }
 

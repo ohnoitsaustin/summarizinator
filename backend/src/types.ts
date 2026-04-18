@@ -16,12 +16,16 @@ export type Project = {
   createdAt: string
 }
 
+export type AudienceMode = 'engineering' | 'product' | 'executive'
+
 export type Update = {
   id: string
   projectId: string
   content: string
   rawEvents: string
   createdAt: string
+  audience: AudienceMode
+  generationContext?: string
 }
 
 export type GithubEvent = {

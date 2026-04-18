@@ -1,12 +1,17 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, type Project, type UpdateSummary, type GithubEvent } from '../api/client'
+import { api, type Project, type UpdateSummary, type GithubEvent, type AudienceMode } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
 import PastUpdateCard from '../components/PastUpdateCard'
 import LoadingDots from '../components/LoadingDots'
 
+const AUDIENCE_OPTIONS: { value: AudienceMode; label: string }[] = [
+  { value: 'engineering', label: 'Engineering' },
+  { value: 'product', label: 'Product' },
+  { value: 'executive', label: 'Executive' },
+]
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +27,8 @@ export default function ProjectPage() {
   const [hiddenAuthors, setHiddenAuthors] = useState<Set<string>>(new Set())
   const [highlightedAuthors, setHighlightedAuthors] = useState<Set<string>>(new Set())
   const [days, setDays] = useState(7)
+  const [audience, setAudience] = useState<AudienceMode>('engineering')
+  const [context, setContext] = useState('')
   const [generating, setGenerating] = useState(false)
   const [fetchingEvents, setFetchingEvents] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +50,8 @@ export default function ProjectPage() {
         if (list.length > 0) {
           setActiveContent(list[0].content)
           setActiveUpdateId(list[0].id)
+          setAudience(list[0].audience ?? 'engineering')
+          setContext(list[0].generationContext ?? '')
         }
       })
       .catch(() => setError('Failed to load updates'))
@@ -132,8 +141,15 @@ export default function ProjectPage() {
     setError(null)
     resetCuration()
     try {
-      const result = await api.updates.generate(id, days)
-      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
+      const result = await api.updates.generate(id, days, audience, context.trim() || undefined)
+      const newUpdate: UpdateSummary = {
+        id: result.updateId,
+        content: result.content,
+        createdAt: new Date().toISOString(),
+        events: result.events,
+        audience: result.audience,
+        generationContext: result.generationContext,
+      }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
@@ -157,8 +173,17 @@ export default function ProjectPage() {
         Array.from(effectiveHiddenIds()),
         Array.from(effectiveHighlightedIds()),
         days,
+        audience,
+        context.trim() || undefined,
       )
-      const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
+      const newUpdate: UpdateSummary = {
+        id: result.updateId,
+        content: result.content,
+        createdAt: new Date().toISOString(),
+        events: result.events,
+        audience: result.audience,
+        generationContext: result.generationContext,
+      }
       setUpdates(prev => [newUpdate, ...prev])
       setActiveContent(result.content)
       setActiveUpdateId(result.updateId)
@@ -221,22 +246,49 @@ export default function ProjectPage() {
         />
       )}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <GenerateButton onClick={handleGenerate} loading={generating} />
-        <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
-          {SPAN_OPTIONS.map(({ d, label }, i) => (
-            <button
-              key={d}
-              onClick={() => handleDaysChange(d)}
-              disabled={fetchingEvents}
-              className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
-            >
-              {label}
-            </button>
-          ))}
+      <div className="space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <GenerateButton onClick={handleGenerate} loading={generating} />
+          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+            {SPAN_OPTIONS.map(({ d, label }, i) => (
+              <button
+                key={d}
+                onClick={() => handleDaysChange(d)}
+                disabled={fetchingEvents}
+                className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {fetchingEvents && <LoadingDots className="text-brand-mid" />}
         </div>
-        {fetchingEvents && <LoadingDots className="text-brand-mid" />}
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-brand-mid/70 shrink-0">Audience</span>
+          <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+            {AUDIENCE_OPTIONS.map(({ value, label }, i) => (
+              <button
+                key={value}
+                onClick={() => setAudience(value)}
+                className={`px-3 py-2 transition-colors ${audience === value ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                  } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <textarea
+          value={context}
+          onChange={e => setContext(e.target.value)}
+          maxLength={1000}
+          placeholder="Additional context (optional) — release timing, staffing changes, shifted priorities, known blockers..."
+          className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-mid/40 resize-none focus:outline-none focus:border-brand-mid/60 transition-colors"
+          rows={2}
+        />
       </div>
 
       {activeContent && (

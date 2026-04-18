@@ -23,11 +23,15 @@ export type Project = {
   createdAt: string
 }
 
+export type AudienceMode = 'engineering' | 'product' | 'executive'
+
 export type UpdateSummary = {
   id: string
   content: string
   createdAt: string
   events: GithubEvent[]
+  audience: AudienceMode
+  generationContext?: string
 }
 
 export type GithubEvent = {
@@ -41,7 +45,13 @@ export type GithubEvent = {
   highlighted?: boolean
 }
 
-type GenerateResult = { updateId: string; content: string; events: GithubEvent[] }
+type GenerateResult = {
+  updateId: string
+  content: string
+  events: GithubEvent[]
+  audience: AudienceMode
+  generationContext?: string
+}
 
 export const api = {
   auth: {
@@ -57,15 +67,23 @@ export const api = {
       request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
   },
   updates: {
-    generate: (projectId: string, days = 7) =>
+    generate: (projectId: string, days = 7, audience: AudienceMode = 'engineering', context?: string) =>
       request<GenerateResult>('/api/updates/generate', {
         method: 'POST',
-        body: JSON.stringify({ projectId, days }),
+        body: JSON.stringify({ projectId, days, audience, context }),
       }),
-    regenerate: (updateId: string, projectId: string, hiddenIds?: string[], highlightedIds?: string[], days?: number) =>
+    regenerate: (
+      updateId: string,
+      projectId: string,
+      hiddenIds?: string[],
+      highlightedIds?: string[],
+      days?: number,
+      audience?: AudienceMode,
+      context?: string,
+    ) =>
       request<GenerateResult>(`/api/updates/${updateId}/regenerate`, {
         method: 'POST',
-        body: JSON.stringify({ projectId, hiddenIds, highlightedIds, days }),
+        body: JSON.stringify({ projectId, hiddenIds, highlightedIds, days, audience, context }),
       }),
     list: (projectId: string) =>
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),
