@@ -412,13 +412,13 @@ Returns list of past updates for a project (id, createdAt, content preview).
 
 ### Phase 3 — LLM Generation (Day 5)
 
-[ ] Prompt integration
-[ ] First usable output
+[x] Prompt integration
+[x] First usable output
 
 ### Phase 4 — UI + Editing (Day 6)
 
-[ ] Editor page
-[ ] Copy flow
+[x] Editor page
+[x] Copy flow
 
 ### Phase 5 — Polish + Deploy (Day 7)
 
