@@ -90,6 +90,11 @@ export class SummarizinatorStack extends cdk.Stack {
       actions: ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream'],
       resources: ['*'],
     }))
+    updatesFn.addToRolePolicy(new iam.PolicyStatement({
+      effect: iam.Effect.ALLOW,
+      actions: ['aws-marketplace:ViewSubscriptions', 'aws-marketplace:Subscribe', 'aws-marketplace:Unsubscribe'],
+      resources: ['*'],
+    }))
 
     const api = new apigwv2.HttpApi(this, 'Api', {
       apiName: 'summarizinator-api',
