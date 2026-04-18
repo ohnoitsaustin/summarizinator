@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom'
 import { api, type Project, type UpdateSummary, type GithubEvent } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
-import CopyButton from '../components/CopyButton'
 import EventList from '../components/EventList'
 
 export default function ProjectPage() {
@@ -147,20 +146,8 @@ export default function ProjectPage() {
 
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
-        <div className="flex items-center gap-3">
+        <div>
           <GenerateButton onClick={handleGenerate} loading={generating} />
-          {activeContent && (
-            <>
-              <button
-                onClick={handleRegenerate}
-                disabled={generating}
-                className="px-4 py-2 border border-brand-mid/50 hover:border-brand-accent disabled:opacity-50 rounded-lg text-sm transition-colors"
-              >
-                Regenerate
-              </button>
-              <CopyButton text={activeContent} />
-            </>
-          )}
         </div>
 
         {events.length > 0 && (
@@ -178,7 +165,12 @@ export default function ProjectPage() {
         )}
 
         {activeContent && (
-          <UpdateEditor content={activeContent} onChange={setActiveContent} />
+          <UpdateEditor
+            content={activeContent}
+            onChange={setActiveContent}
+            onRegenerate={handleRegenerate}
+            regenerating={generating}
+          />
         )}
 
         {updates.length > 1 && (
