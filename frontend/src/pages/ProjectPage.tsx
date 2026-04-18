@@ -16,6 +16,8 @@ export default function ProjectPage() {
   const [events, setEvents] = useState<GithubEvent[]>([])
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
+  const [hiddenAuthors, setHiddenAuthors] = useState<Set<string>>(new Set())
+  const [highlightedAuthors, setHighlightedAuthors] = useState<Set<string>>(new Set())
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -52,12 +54,51 @@ export default function ProjectPage() {
     })
   }
 
+  function toggleHideAuthor(author: string) {
+    setHiddenAuthors(prev => {
+      const next = new Set(prev)
+      if (next.has(author)) next.delete(author)
+      else { next.add(author); setHighlightedAuthors(h => { const hn = new Set(h); hn.delete(author); return hn }) }
+      return next
+    })
+  }
+
+  function toggleHighlightAuthor(author: string) {
+    setHighlightedAuthors(prev => {
+      const next = new Set(prev)
+      if (next.has(author)) next.delete(author)
+      else next.add(author)
+      return next
+    })
+  }
+
+  function resetCuration() {
+    setHiddenIds(new Set())
+    setHighlightedIds(new Set())
+    setHiddenAuthors(new Set())
+    setHighlightedAuthors(new Set())
+  }
+
+  function effectiveHiddenIds() {
+    return new Set([
+      ...hiddenIds,
+      ...events.filter(e => hiddenAuthors.has(e.author)).map(e => e.id),
+    ])
+  }
+
+  function effectiveHighlightedIds() {
+    const hidden = effectiveHiddenIds()
+    return new Set([
+      ...highlightedIds,
+      ...events.filter(e => highlightedAuthors.has(e.author) && !hidden.has(e.id)).map(e => e.id),
+    ])
+  }
+
   async function handleGenerate() {
     if (!id) return
     setGenerating(true)
     setError(null)
-    setHiddenIds(new Set())
-    setHighlightedIds(new Set())
+    resetCuration()
     try {
       const result = await api.updates.generate(id)
       const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
@@ -80,8 +121,8 @@ export default function ProjectPage() {
       const result = await api.updates.regenerate(
         activeUpdateId,
         id,
-        Array.from(hiddenIds),
-        Array.from(highlightedIds),
+        Array.from(effectiveHiddenIds()),
+        Array.from(effectiveHighlightedIds()),
       )
       const newUpdate: UpdateSummary = { id: result.updateId, content: result.content, createdAt: new Date().toISOString(), events: result.events }
       setUpdates(prev => [newUpdate, ...prev])
@@ -127,8 +168,12 @@ export default function ProjectPage() {
             events={events}
             hiddenIds={hiddenIds}
             highlightedIds={highlightedIds}
+            hiddenAuthors={hiddenAuthors}
+            highlightedAuthors={highlightedAuthors}
             onToggleHide={toggleHide}
             onToggleHighlight={toggleHighlight}
+            onToggleHideAuthor={toggleHideAuthor}
+            onToggleHighlightAuthor={toggleHighlightAuthor}
           />
         )}
 
@@ -142,7 +187,7 @@ export default function ProjectPage() {
             {updates.slice(1).map(u => (
               <button
                 key={u.id}
-                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id); setEvents(u.events ?? []); setHiddenIds(new Set()); setHighlightedIds(new Set()) }}
+                onClick={() => { setActiveContent(u.content); setActiveUpdateId(u.id); setEvents(u.events ?? []); resetCuration() }}
                 className="w-full text-left px-4 py-3 bg-brand-surface hover:bg-brand-mid/30 border border-brand-mid/50 rounded-lg text-sm text-brand-accent/70 transition-colors"
               >
                 {new Date(u.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
