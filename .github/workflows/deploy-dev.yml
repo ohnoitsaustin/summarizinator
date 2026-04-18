@@ -1,0 +1,64 @@
+name: Deploy (dev)
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build --workspace=frontend
+        env:
+          VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID_DEV }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: CDK deploy
+        working-directory: infra
+        run: npx cdk deploy Summarizinator-dev --require-approval never
+        env:
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
+          CERT_ARN: ${{ secrets.CERT_ARN_DEV }}
+
+      - name: Get stack outputs
+        id: outputs
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks --stack-name Summarizinator-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='SiteBucketName'].OutputValue" --output text)
+          DIST_ID=$(aws cloudformation describe-stacks --stack-name Summarizinator-dev \
+            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
+          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
+          echo "dist_id=$DIST_ID" >> $GITHUB_OUTPUT
+
+      - name: Sync frontend to S3
+        run: aws s3 sync frontend/dist/ s3://${{ steps.outputs.outputs.bucket }}/ --delete
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ steps.outputs.outputs.dist_id }} \
+            --paths "/*"

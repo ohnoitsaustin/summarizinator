@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy (prod)
 
 on:
   push:
@@ -28,28 +28,28 @@ jobs:
       - name: Build frontend
         run: npm run build --workspace=frontend
         env:
-          VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID }}
+          VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID_PROD }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-east-1
 
       - name: CDK deploy
         working-directory: infra
-        run: npx cdk deploy --require-approval never
+        run: npx cdk deploy Summarizinator-prod --require-approval never
         env:
           CDK_DEFAULT_ACCOUNT: ${{ secrets.AWS_ACCOUNT_ID }}
-          CDK_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          CERT_ARN: ${{ secrets.CERT_ARN_PROD }}
 
       - name: Get stack outputs
         id: outputs
         run: |
-          BUCKET=$(aws cloudformation describe-stacks --stack-name Summarizinator \
+          BUCKET=$(aws cloudformation describe-stacks --stack-name Summarizinator-prod \
             --query "Stacks[0].Outputs[?OutputKey=='SiteBucketName'].OutputValue" --output text)
-          DIST_ID=$(aws cloudformation describe-stacks --stack-name Summarizinator \
+          DIST_ID=$(aws cloudformation describe-stacks --stack-name Summarizinator-prod \
             --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
           echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
           echo "dist_id=$DIST_ID" >> $GITHUB_OUTPUT

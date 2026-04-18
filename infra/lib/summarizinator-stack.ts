@@ -1,5 +1,6 @@
 import * as path from 'path'
 import * as cdk from 'aws-cdk-lib'
+import * as acm from 'aws-cdk-lib/aws-certificatemanager'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs'
@@ -12,17 +13,32 @@ import * as ssm from 'aws-cdk-lib/aws-ssm'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import { Construct } from 'constructs'
 
-// Prerequisites: create these SSM parameters before first deploy:
-//   /summarizinator/github-client-id
-//   /summarizinator/github-client-secret
-//   /summarizinator/jwt-secret  (use a long random string)
+// Prerequisites per environment — create these SSM parameters before first deploy:
+//   /summarizinator/{env}/github-client-id
+//   /summarizinator/{env}/github-client-secret
+//   /summarizinator/{env}/jwt-secret
+//
+// Also required: ACM certificate in us-east-1 covering the domain, passed via certArn.
+
+export interface SummarizinatorStackConfig {
+  stackEnv: 'dev' | 'prod'
+  domainName: string   // e.g. "dev.summarizinator.com" or "summarizinator.com"
+  certArn: string      // ACM cert ARN in us-east-1
+}
+
+interface SummarizinatorStackProps extends cdk.StackProps {
+  config: SummarizinatorStackConfig
+}
 
 export class SummarizinatorStack extends cdk.Stack {
-  constructor(scope: Construct, id: string, props?: cdk.StackProps) {
+  constructor(scope: Construct, id: string, props: SummarizinatorStackProps) {
     super(scope, id, props)
 
+    const { config } = props
+    const ssmPrefix = `/summarizinator/${config.stackEnv}`
+
     const table = new dynamodb.Table(this, 'Table', {
-      tableName: 'summarizinator',
+      tableName: `summarizinator-${config.stackEnv}`,
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -35,9 +51,9 @@ export class SummarizinatorStack extends cdk.Stack {
       sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
     })
 
-    const githubClientId = ssm.StringParameter.valueForStringParameter(this, '/summarizinator/github-client-id')
-    const githubClientSecret = ssm.StringParameter.valueForStringParameter(this, '/summarizinator/github-client-secret')
-    const jwtSecret = ssm.StringParameter.valueForStringParameter(this, '/summarizinator/jwt-secret')
+    const githubClientId = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-id`)
+    const githubClientSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-secret`)
+    const jwtSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/jwt-secret`)
 
     const handlerDir = path.join(__dirname, '../../backend/src/handlers')
 
@@ -80,7 +96,6 @@ export class SummarizinatorStack extends cdk.Stack {
       ...lambdaDefaults,
       entry: path.join(handlerDir, 'updates.ts'),
       timeout: cdk.Duration.seconds(60),
-      // Bundle the Bedrock client — it may not be available in the base Lambda runtime
       bundling: { ...lambdaDefaults.bundling, externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb'] },
       environment: { ...lambdaDefaults.environment, BEDROCK_MODEL_ID },
     })
@@ -97,7 +112,7 @@ export class SummarizinatorStack extends cdk.Stack {
     }))
 
     const api = new apigwv2.HttpApi(this, 'Api', {
-      apiName: 'summarizinator-api',
+      apiName: `summarizinator-api-${config.stackEnv}`,
       corsPreflight: {
         allowOrigins: ['*'],
         allowMethods: [apigwv2.CorsHttpMethod.ANY],
@@ -105,41 +120,13 @@ export class SummarizinatorStack extends cdk.Stack {
       },
     })
 
-    api.addRoutes({
-      path: '/api/auth/token',
-      methods: [apigwv2.HttpMethod.POST],
-      integration: new HttpLambdaIntegration('AuthInt', authFn),
-    })
-    api.addRoutes({
-      path: '/api/projects',
-      methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
-      integration: new HttpLambdaIntegration('ProjectsInt', projectsFn),
-    })
-    api.addRoutes({
-      path: '/api/updates/generate',
-      methods: [apigwv2.HttpMethod.POST],
-      integration: new HttpLambdaIntegration('UpdatesGenerateInt', updatesFn),
-    })
-    api.addRoutes({
-      path: '/api/updates/{id}/regenerate',
-      methods: [apigwv2.HttpMethod.POST],
-      integration: new HttpLambdaIntegration('UpdatesRegenerateInt', updatesFn),
-    })
-    api.addRoutes({
-      path: '/api/projects/{projectId}/updates',
-      methods: [apigwv2.HttpMethod.GET],
-      integration: new HttpLambdaIntegration('ProjectUpdatesInt', updatesFn),
-    })
-    api.addRoutes({
-      path: '/api/projects/{projectId}/events',
-      methods: [apigwv2.HttpMethod.GET],
-      integration: new HttpLambdaIntegration('ProjectEventsInt', updatesFn),
-    })
-    api.addRoutes({
-      path: '/api/updates/{id}',
-      methods: [apigwv2.HttpMethod.DELETE, apigwv2.HttpMethod.PATCH],
-      integration: new HttpLambdaIntegration('UpdateCrudInt', updatesFn),
-    })
+    api.addRoutes({ path: '/api/auth/token', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('AuthInt', authFn) })
+    api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('ProjectsInt', projectsFn) })
+    api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesGenerateInt', updatesFn) })
+    api.addRoutes({ path: '/api/updates/{id}/regenerate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesRegenerateInt', updatesFn) })
+    api.addRoutes({ path: '/api/projects/{projectId}/updates', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectUpdatesInt', updatesFn) })
+    api.addRoutes({ path: '/api/projects/{projectId}/events', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectEventsInt', updatesFn) })
+    api.addRoutes({ path: '/api/updates/{id}', methods: [apigwv2.HttpMethod.DELETE, apigwv2.HttpMethod.PATCH], integration: new HttpLambdaIntegration('UpdateCrudInt', updatesFn) })
 
     const siteBucket = new s3.Bucket(this, 'SiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -147,10 +134,13 @@ export class SummarizinatorStack extends cdk.Stack {
       autoDeleteObjects: true,
     })
 
+    const certificate = acm.Certificate.fromCertificateArn(this, 'Cert', config.certArn)
     const apiDomain = `${api.apiId}.execute-api.${this.region}.amazonaws.com`
 
     const distribution = new cloudfront.Distribution(this, 'Distribution', {
       defaultRootObject: 'index.html',
+      domainNames: [config.domainName],
+      certificate,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -165,7 +155,6 @@ export class SummarizinatorStack extends cdk.Stack {
           allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
         },
       },
-      // SPA fallback: return index.html for 403/404 so React Router handles the route
       errorResponses: [
         { httpStatus: 403, responseHttpStatus: 200, responsePagePath: '/index.html' },
         { httpStatus: 404, responseHttpStatus: 200, responsePagePath: '/index.html' },
@@ -174,7 +163,8 @@ export class SummarizinatorStack extends cdk.Stack {
 
     new cdk.CfnOutput(this, 'SiteBucketName', { value: siteBucket.bucketName })
     new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId })
-    new cdk.CfnOutput(this, 'AppUrl', { value: `https://${distribution.distributionDomainName}` })
+    new cdk.CfnOutput(this, 'AppUrl', { value: `https://${config.domainName}` })
+    new cdk.CfnOutput(this, 'CloudFrontDomain', { value: distribution.distributionDomainName, description: 'Point your DNS CNAME here' })
     new cdk.CfnOutput(this, 'ApiEndpoint', { value: api.apiEndpoint })
   }
 }
