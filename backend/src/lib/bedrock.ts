@@ -2,7 +2,7 @@ import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedroc
 import type { GithubEvent } from '../types'
 import { postprocessContent } from './postprocessing'
 
-const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'anthropic.claude-sonnet-4-6'
+const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.anthropic.claude-sonnet-4-6-20250514-v1:0'
 const client = new BedrockRuntimeClient({})
 
 const SYSTEM_PROMPT =

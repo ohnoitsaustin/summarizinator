@@ -74,7 +74,7 @@ export class SummarizinatorStack extends cdk.Stack {
     })
     table.grantReadWriteData(projectsFn)
 
-    const BEDROCK_MODEL_ID = 'anthropic.claude-sonnet-4-6'
+    const BEDROCK_MODEL_ID = 'us.anthropic.claude-sonnet-4-6-20250514-v1:0'
 
     const updatesFn = new NodejsFunction(this, 'UpdatesFn', {
       ...lambdaDefaults,
@@ -88,7 +88,10 @@ export class SummarizinatorStack extends cdk.Stack {
     updatesFn.addToRolePolicy(new iam.PolicyStatement({
       effect: iam.Effect.ALLOW,
       actions: ['bedrock:InvokeModel'],
-      resources: [`arn:aws:bedrock:${this.region}::foundation-model/${BEDROCK_MODEL_ID}`],
+      resources: [
+        `arn:aws:bedrock:${this.region}::foundation-model/anthropic.claude-sonnet-4-6-20250514-v1:0`,
+        `arn:aws:bedrock:*:${this.account}:inference-profile/us.anthropic.claude-sonnet-4-6-20250514-v1:0`,
+      ],
     }))
 
     const api = new apigwv2.HttpApi(this, 'Api', {
