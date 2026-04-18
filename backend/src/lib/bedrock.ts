@@ -56,7 +56,7 @@ type BedrockResponse = { content: { type: string; text: string }[] }
 
 export async function generateUpdate(events: GithubEvent[], days: number): Promise<string> {
   const label = periodLabel(days)
-  const systemPrompt = `You are a senior engineering manager writing a concise ${label.toLowerCase()} update for leadership. Focus on outcomes, risks, and changes. Avoid fluff.`
+  const systemPrompt = `You are a senior engineering manager writing a concise ${label.toLowerCase()} update for leadership. Focus on outcomes, risks, and changes. Avoid fluff. Make sound judgement calls on what should be included and what should be left out. The update should be impactful and informative, not just a list of activities.`
   const command = new InvokeModelCommand({
     modelId: MODEL_ID,
     contentType: 'application/json',
