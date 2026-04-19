@@ -37,10 +37,12 @@ export default function UpdateEditor({ content, onChange }: Props) {
           className="w-full h-96 bg-brand-bg p-4 text-sm font-mono text-white focus:outline-none resize-none"
         />
       ) : (
-        <div className="h-96 overflow-y-auto bg-brand-bg p-4 text-sm text-brand-accent prose prose-invert prose-sm max-w-none
+        <div className="h-96 overflow-y-auto bg-brand-bg p-4 text-sm text-brand-accent
           [&_h2]:text-white [&_h2]:text-base [&_h2]:font-semibold [&_h2]:mt-4 [&_h2]:mb-2
           [&_h3]:text-brand-accent [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1
-          [&_ul]:space-y-1 [&_li]:text-brand-accent/90 [&_p]:text-brand-accent/90">
+          [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1
+          [&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:space-y-1
+          [&_li]:text-brand-accent/90 [&_p]:text-brand-accent/90">
           <ReactMarkdown>{content}</ReactMarkdown>
         </div>
       )}
