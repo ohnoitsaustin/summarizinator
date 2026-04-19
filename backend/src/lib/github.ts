@@ -81,6 +81,33 @@ async function fetchIssues(token: string, owner: string, repo: string, since: st
     }))
 }
 
+type GHRelease = {
+  name: string | null
+  tag_name: string
+  body: string | null
+  author: { login: string }
+  published_at: string | null
+  html_url: string
+  draft: boolean
+  prerelease: boolean
+}
+
+async function fetchReleases(token: string, owner: string, repo: string, since: string): Promise<GithubEvent[]> {
+  const res = await ghFetch(`/repos/${owner}/${repo}/releases?per_page=100`, token)
+  const releases = await res.json() as GHRelease[]
+  return releases
+    .filter(r => !r.draft && r.published_at && r.published_at >= since)
+    .map(r => ({
+      id: r.html_url,
+      type: 'release' as const,
+      title: r.name || r.tag_name,
+      body: r.body ?? undefined,
+      author: r.author.login,
+      createdAt: r.published_at!,
+      url: r.html_url,
+    }))
+}
+
 async function fetchCommits(token: string, owner: string, repo: string, since: string): Promise<GithubEvent[]> {
   const res = await ghFetch(`/repos/${owner}/${repo}/commits?since=${since}&per_page=100`, token)
   const commits = await res.json() as GHCommit[]
@@ -101,10 +128,11 @@ export async function fetchRepoEvents(
   days: number,
 ): Promise<GithubEvent[]> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  const [prs, issues, commits] = await Promise.all([
+  const [releases, prs, issues, commits] = await Promise.all([
+    fetchReleases(token, owner, repo, since),
     fetchPRs(token, owner, repo, since),
     fetchIssues(token, owner, repo, since),
     fetchCommits(token, owner, repo, since),
   ])
-  return [...prs, ...issues, ...commits]
+  return [...releases, ...prs, ...issues, ...commits]
 }

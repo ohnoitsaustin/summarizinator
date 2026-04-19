@@ -31,7 +31,7 @@ export type Update = {
 
 export type GithubEvent = {
   id: string           // stable identifier (html_url)
-  type: 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
+  type: 'release' | 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
   title: string
   body?: string
   author: string

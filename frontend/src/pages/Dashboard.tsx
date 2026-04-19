@@ -4,6 +4,25 @@ import { api, type Project } from '../api/client'
 import ProjectCard from '../components/ProjectCard'
 import LoadingDots from '../components/LoadingDots'
 
+const ORDER_KEY = 'project-order'
+
+function applyStoredOrder(projects: Project[]): Project[] {
+  try {
+    const order: string[] = JSON.parse(localStorage.getItem(ORDER_KEY) ?? '[]')
+    if (!order.length) return projects
+    const map = new Map(projects.map(p => [p.id, p]))
+    const sorted = order.filter(id => map.has(id)).map(id => map.get(id)!)
+    const unseen = projects.filter(p => !order.includes(p.id))
+    return [...unseen, ...sorted]
+  } catch {
+    return projects
+  }
+}
+
+function saveOrder(projects: Project[]) {
+  localStorage.setItem(ORDER_KEY, JSON.stringify(projects.map(p => p.id)))
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
@@ -12,10 +31,15 @@ export default function Dashboard() {
   const [form, setForm] = useState({ name: '', repoOwner: '', repoName: '' })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [dropIndex, setDropIndex] = useState<number | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '' })
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     api.projects.list()
-      .then(setProjects)
+      .then(list => setProjects(applyStoredOrder(list)))
       .catch(() => setError('Failed to load projects'))
       .finally(() => setLoading(false))
   }, [])
@@ -26,7 +50,11 @@ export default function Dashboard() {
     setError(null)
     try {
       const project = await api.projects.create(form)
-      setProjects(p => [...p, project])
+      setProjects(p => {
+        const next = [project, ...p]
+        saveOrder(next)
+        return next
+      })
       setShowForm(false)
       setForm({ name: '', repoOwner: '', repoName: '' })
     } catch (err) {
@@ -34,6 +62,61 @@ export default function Dashboard() {
     } finally {
       setCreating(false)
     }
+  }
+
+  function startEdit(p: Project) {
+    setEditingId(p.id)
+    setEditForm({ name: p.name, repoOwner: p.repoOwner, repoName: p.repoName })
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingId) return
+    setSaving(true)
+    try {
+      const updated = await api.projects.patch(editingId, editForm)
+      setProjects(prev => prev.map(p => p.id === editingId ? updated : p))
+      setEditingId(null)
+    } catch {
+      setError('Failed to save project')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function handleDragStart(e: React.DragEvent, id: string) {
+    setDraggedId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  function handleDragOver(e: React.DragEvent, index: number) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const rect = e.currentTarget.getBoundingClientRect()
+    const insert = e.clientY < rect.top + rect.height / 2 ? index : index + 1
+    setDropIndex(insert)
+  }
+
+  function handleDrop() {
+    if (draggedId === null || dropIndex === null) return
+    setProjects(prev => {
+      const from = prev.findIndex(p => p.id === draggedId)
+      if (from === -1) return prev
+      const adjusted = dropIndex > from ? dropIndex - 1 : dropIndex
+      if (adjusted === from) return prev
+      const next = [...prev]
+      next.splice(from, 1)
+      next.splice(adjusted, 0, prev[from])
+      saveOrder(next)
+      return next
+    })
+    setDraggedId(null)
+    setDropIndex(null)
+  }
+
+  function handleDragEnd() {
+    setDraggedId(null)
+    setDropIndex(null)
   }
 
   return (
@@ -67,13 +150,22 @@ export default function Dashboard() {
                 placeholder="Owner (e.g. acme)"
                 value={form.repoOwner}
                 onChange={e => setForm(f => ({ ...f, repoOwner: e.target.value }))}
+                onPaste={e => {
+                  const text = e.clipboardData.getData('text')
+                  if (!text.includes('/')) return
+                  e.preventDefault()
+                  const slash = text.indexOf('/')
+                  const owner = text.slice(0, slash).trim()
+                  const repo = text.slice(slash + 1).trim()
+                  setForm(f => ({ ...f, repoOwner: owner, repoName: repo, name: f.name || repo }))
+                }}
                 className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
               />
               <input
                 required
                 placeholder="Repo (e.g. api)"
                 value={form.repoName}
-                onChange={e => setForm(f => ({ ...f, repoName: e.target.value }))}
+                onChange={e => setForm(f => ({ ...f, repoName: e.target.value, name: f.name || e.target.value }))}
                 className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
               />
             </div>
@@ -102,10 +194,71 @@ export default function Dashboard() {
       ) : projects.length === 0 && !showForm ? (
         <p className="text-brand-mid">No projects yet. Add one to get started.</p>
       ) : (
-        <div className="space-y-3">
-          {projects.map(p => (
-            <ProjectCard key={p.id} project={p} onClick={() => navigate(`/projects/${p.id}`)} />
+        <div onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropIndex(null) }}>
+          {projects.map((p, i) => (
+            <div key={p.id}>
+              <div className={`h-0.5 rounded-full my-1.5 transition-colors ${dropIndex === i && draggedId !== p.id ? 'bg-brand-accent' : 'bg-transparent'}`} />
+              {editingId === p.id ? (
+                <form onSubmit={handleSaveEdit} className="bg-brand-surface border border-brand-mid/50 rounded-xl px-6 py-4 space-y-3">
+                  <input
+                    required autoFocus
+                    value={editForm.name}
+                    onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Project name"
+                    className="w-full bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                  />
+                  <div className="flex gap-2">
+                    <input
+                      required
+                      value={editForm.repoOwner}
+                      onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
+                      placeholder="Owner"
+                      className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                    />
+                    <input
+                      required
+                      value={editForm.repoName}
+                      onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
+                      placeholder="Repo"
+                      className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={saving} className="px-3 py-1.5 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded-lg text-xs text-brand-bg font-medium transition-colors">
+                      {saving ? 'Saving…' : 'Save'}
+                    </button>
+                    <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 text-brand-mid hover:text-white text-xs transition-colors">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div
+                  draggable
+                  onDragStart={e => handleDragStart(e, p.id)}
+                  onDragOver={e => handleDragOver(e, i)}
+                  onDrop={handleDrop}
+                  onDragEnd={handleDragEnd}
+                  className={`flex items-center gap-2 group transition-opacity ${draggedId === p.id ? 'opacity-40' : 'opacity-100'}`}
+                >
+                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-brand-mid/30 group-hover:text-brand-mid/60 transition-colors px-1 select-none">
+                    ⠿
+                  </div>
+                  <div className="flex-1">
+                    <ProjectCard project={p} onClick={() => navigate(`/projects/${p.id}`)} />
+                  </div>
+                  <button
+                    onClick={() => startEdit(p)}
+                    className="shrink-0 px-1 text-brand-mid/30 hover:text-brand-mid transition-colors text-sm"
+                    title="Edit project"
+                  >
+                    ✎
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
+          <div className={`h-0.5 rounded-full mt-1.5 transition-colors ${dropIndex === projects.length ? 'bg-brand-accent' : 'bg-transparent'}`} />
         </div>
       )}
     </div>

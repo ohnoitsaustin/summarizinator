@@ -37,7 +37,7 @@ export type UpdateSummary = {
 
 export type GithubEvent = {
   id: string
-  type: 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
+  type: 'release' | 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
   title: string
   body?: string
   author: string
@@ -66,12 +66,14 @@ export const api = {
     list: () => request<Project[]>('/api/projects'),
     create: (data: { name: string; repoOwner: string; repoName: string }) =>
       request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
+    patch: (id: string, data: { name: string; repoOwner: string; repoName: string }) =>
+      request<Project>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   updates: {
-    generate: (projectId: string, days = 7, audience: AudienceMode = 'engineering', context?: string) =>
+    generate: (projectId: string, days = 7, audience: AudienceMode = 'engineering', context?: string, hiddenIds?: string[], highlightedIds?: string[]) =>
       request<GenerateResult>('/api/updates/generate', {
         method: 'POST',
-        body: JSON.stringify({ projectId, days, audience, context }),
+        body: JSON.stringify({ projectId, days, audience, context, hiddenIds, highlightedIds }),
       }),
     save: (projectId: string, name: string, content: string, rawEvents: GithubEvent[], audience: AudienceMode, context?: string) =>
       request<UpdateSummary>('/api/updates/save', {

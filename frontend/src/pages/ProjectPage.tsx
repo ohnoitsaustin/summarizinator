@@ -41,8 +41,14 @@ export default function ProjectPage() {
   const [showSave, setShowSave] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editingProject, setEditingProject] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '' })
+  const [savingProject, setSavingProject] = useState(false)
 
-  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  const since = useMemo(
+    () => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
+    [days],
+  )
   const events = useMemo(
     () => allEvents.filter(e => e.createdAt >= since),
     [allEvents, since],
@@ -121,11 +127,34 @@ export default function ProjectPage() {
     })
   }
 
-  function resetCuration() {
-    setHiddenIds(new Set())
-    setHighlightedIds(new Set())
-    setHiddenAuthors(new Set())
-    setHighlightedAuthors(new Set())
+  function handleBulkHighlight(ids: string[], value: boolean) {
+    setHighlightedIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => value ? next.add(id) : next.delete(id))
+      return next
+    })
+    if (value) {
+      setHiddenIds(prev => {
+        const next = new Set(prev)
+        ids.forEach(id => next.delete(id))
+        return next
+      })
+    }
+  }
+
+  function handleBulkHide(ids: string[], value: boolean) {
+    setHiddenIds(prev => {
+      const next = new Set(prev)
+      ids.forEach(id => value ? next.add(id) : next.delete(id))
+      return next
+    })
+    if (value) {
+      setHighlightedIds(prev => {
+        const next = new Set(prev)
+        ids.forEach(id => next.delete(id))
+        return next
+      })
+    }
   }
 
   async function handleGenerate() {
@@ -133,13 +162,13 @@ export default function ProjectPage() {
     setGenerating(true)
     setError(null)
     setShowSave(false)
-    resetCuration()
     try {
-      const result = await api.updates.generate(id, days, audience, context.trim() || undefined)
+      const effectiveHighlightedIds = events
+        .filter(e => highlightedIds.has(e.id) || highlightedAuthors.has(e.author))
+        .map(e => e.id)
+      const result = await api.updates.generate(id, days, audience, context.trim() || undefined, [...hiddenIds], effectiveHighlightedIds)
       setActiveContent(result.content)
       setActiveEvents(result.events)
-      setAllEvents(result.events)
-      setFetchedDays(days)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed')
     } finally {
@@ -194,6 +223,21 @@ export default function ProjectPage() {
     }
   }
 
+  async function handleSaveProject(e: React.FormEvent) {
+    e.preventDefault()
+    if (!project) return
+    setSavingProject(true)
+    try {
+      const updated = await api.projects.patch(project.id, editForm)
+      setProject(updated)
+      setEditingProject(false)
+    } catch {
+      setError('Failed to save project')
+    } finally {
+      setSavingProject(false)
+    }
+  }
+
   const SPAN_OPTIONS = [
     { d: 7, label: 'Weekly' },
     { d: 14, label: 'Bi-Weekly' },
@@ -213,8 +257,56 @@ export default function ProjectPage() {
     <div className="px-6 py-10 max-w-screen-xl mx-auto">
       {project && (
         <div className="mb-6">
-          <h2 className="text-xl font-semibold">{project.name}</h2>
-          <p className="text-brand-accent/60 text-sm">{project.repoOwner}/{project.repoName}</p>
+          {editingProject ? (
+            <form onSubmit={handleSaveProject} className="space-y-1.5">
+              <input
+                required autoFocus
+                value={editForm.name}
+                onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Project name"
+                className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-xl font-semibold focus:outline-none w-64 transition-colors block"
+              />
+              <div className="flex items-center gap-1">
+                <input
+                  required
+                  value={editForm.repoOwner}
+                  onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
+                  placeholder="owner"
+                  className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                />
+                <span className="text-brand-accent/40 text-sm">/</span>
+                <input
+                  required
+                  value={editForm.repoName}
+                  onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
+                  placeholder="repo"
+                  className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                />
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={savingProject} className="px-2.5 py-1 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded text-xs text-brand-bg font-medium transition-colors">
+                  {savingProject ? 'Saving…' : 'Save'}
+                </button>
+                <button type="button" onClick={() => setEditingProject(false)} className="px-2 py-1 text-brand-mid hover:text-white text-xs transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="flex items-start gap-3 group">
+              <div>
+                <h2 className="text-xl font-semibold">{project.name}</h2>
+                <p className="text-brand-accent/60 text-sm">{project.repoOwner}/{project.repoName}</p>
+              </div>
+              <button
+                onClick={() => { setEditForm({ name: project.name, repoOwner: project.repoOwner, repoName: project.repoName }); setEditingProject(true) }}
+                className="mt-1 text-brand-mid/30 hover:text-brand-mid opacity-0 group-hover:opacity-100 transition-all text-sm"
+                title="Edit project"
+              >
+                ✎
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -225,6 +317,7 @@ export default function ProjectPage() {
           <div className="lg:w-1/3 shrink-0 mb-6 lg:mb-0 lg:self-start lg:sticky lg:top-6">
             <EventList
               events={events}
+              days={days}
               hiddenIds={hiddenIds}
               highlightedIds={highlightedIds}
               hiddenAuthors={hiddenAuthors}
@@ -233,6 +326,8 @@ export default function ProjectPage() {
               onToggleHighlight={toggleHighlight}
               onToggleHideAuthor={toggleHideAuthor}
               onToggleHighlightAuthor={toggleHighlightAuthor}
+              onBulkHighlight={handleBulkHighlight}
+              onBulkHide={handleBulkHide}
             />
           </div>
         )}
@@ -265,7 +360,11 @@ export default function ProjectPage() {
             />
 
             <div className="flex items-center gap-3 flex-wrap">
-              <GenerateButton onClick={handleGenerate} loading={generating} />
+              <GenerateButton
+                onClick={handleGenerate}
+                loading={generating}
+                allHidden={events.length > 0 && events.every(e => hiddenIds.has(e.id) || hiddenAuthors.has(e.author))}
+              />
               <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
                 {SPAN_OPTIONS.map(({ d, label }, i) => (
                   <button
@@ -319,7 +418,7 @@ export default function ProjectPage() {
                   onClick={openSave}
                   className="text-xs text-brand-mid hover:text-brand-accent transition-colors"
                 >
-                  Save as past update
+                  Save to archive
                 </button>
               )}
             </>
@@ -327,7 +426,7 @@ export default function ProjectPage() {
 
           {updates.length > 0 && (
             <div className="space-y-2">
-              <p className="text-brand-mid text-sm">Past updates</p>
+              <p className="text-brand-mid text-sm">Archive</p>
               {updates.map(u => (
                 <PastUpdateCard
                   key={u.id}

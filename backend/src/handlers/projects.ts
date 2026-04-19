@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProjectsByUser, createProject } from '../lib/dynamo'
+import { getProjectsByUser, createProject, getProject, patchProject } from '../lib/dynamo'
 import { verifyToken } from '../lib/jwt'
 
 const ok = (body: unknown, status = 200): APIGatewayProxyResultV2 => ({
@@ -55,6 +55,17 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       }
       await createProject(project)
       return ok(project, 201)
+    }
+
+    if (method === 'PATCH') {
+      const projectId = event.pathParameters?.id
+      if (!projectId) return err(400, 'Missing project id')
+      const body = JSON.parse(event.body ?? '{}') as { name?: string; repoOwner?: string; repoName?: string }
+      if (!body.name || !body.repoOwner || !body.repoName) return err(400, 'Missing required fields')
+      const project = await getProject(user.sub, projectId)
+      if (!project) return err(404, 'Project not found')
+      await patchProject(user.sub, projectId, { name: body.name, repoOwner: body.repoOwner, repoName: body.repoName })
+      return ok({ ...project, name: body.name, repoOwner: body.repoOwner, repoName: body.repoName })
     }
 
     return err(405, 'Method not allowed')

@@ -49,6 +49,8 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
     days?: number
     audience?: unknown
     context?: string
+    hiddenIds?: string[]
+    highlightedIds?: string[]
   }
   if (!body.projectId) return err(400, 'Missing projectId')
 
@@ -64,7 +66,11 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   const context = body.context?.trim() || undefined
 
   const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
+  const hiddenSet = new Set(body.hiddenIds ?? [])
+  const highlightedSet = new Set(body.highlightedIds ?? [])
   const events = preprocessEvents(rawEvents)
+    .filter(e => !hiddenSet.has(e.id))
+    .map(e => ({ ...e, highlighted: highlightedSet.has(e.id) || undefined }))
   const signals = analyzeRisks(events, context)
   const content = await generateUpdate(events, days, audience, context, signals)
 

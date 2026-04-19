@@ -21,6 +21,7 @@ const PORT = 3001
     { method: 'POST',   pattern: '/api/auth/token',                    handler: authHandler },
     { method: 'GET',    pattern: '/api/projects',                      handler: projectsHandler },
     { method: 'POST',   pattern: '/api/projects',                      handler: projectsHandler },
+    { method: 'PATCH',  pattern: '/api/projects/{id}',                 handler: projectsHandler },
     { method: 'POST',   pattern: '/api/updates/generate',              handler: updatesHandler },
     { method: 'POST',   pattern: '/api/updates/save',                  handler: updatesHandler },
     { method: 'GET',    pattern: '/api/projects/{projectId}/updates',  handler: updatesHandler },

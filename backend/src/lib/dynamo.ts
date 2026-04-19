@@ -111,6 +111,16 @@ export async function patchUpdateContent(projectId: string, updateId: string, co
 }
 
 
+export async function patchProject(userId: string, projectId: string, fields: { name: string; repoOwner: string; repoName: string }): Promise<void> {
+  await client.send(new UpdateCommand({
+    TableName: TABLE,
+    Key: { PK: `USER#${userId}`, SK: `PROJECT#${projectId}` },
+    UpdateExpression: 'SET #name = :name, repoOwner = :repoOwner, repoName = :repoName',
+    ExpressionAttributeNames: { '#name': 'name' },
+    ExpressionAttributeValues: { ':name': fields.name, ':repoOwner': fields.repoOwner, ':repoName': fields.repoName },
+  }))
+}
+
 export async function createUpdate(update: Update): Promise<void> {
   await client.send(new PutCommand({
     TableName: TABLE,

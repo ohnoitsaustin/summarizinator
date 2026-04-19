@@ -53,7 +53,7 @@ function buildUserPrompt(
 ): string {
   const emphasized = events.filter(e => e.highlighted)
   const emphasisSection = emphasized.length > 0
-    ? `EMPHASIZE these items — give them prominent placement:\n${emphasized.map(e => `- ${e.title}`).join('\n')}\n\n`
+    ? `REQUIRED — the following items are marked important and MUST each be individually mentioned by name in the summary:\n${emphasized.map(e => `- ${e.title}`).join('\n')}\n\n`
     : ''
 
   const contextSection = context?.trim()
