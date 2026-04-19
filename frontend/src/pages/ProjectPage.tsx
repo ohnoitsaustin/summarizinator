@@ -35,6 +35,7 @@ export default function ProjectPage() {
   const [audience, setAudience] = useState<AudienceMode>('engineering')
   const [context, setContext] = useState('')
   const [generating, setGenerating] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [fetchingEvents, setFetchingEvents] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showSave, setShowSave] = useState(false)
@@ -49,23 +50,24 @@ export default function ProjectPage() {
 
   useEffect(() => {
     if (!id) return
-    api.projects.list()
-      .then(projects => setProject(projects.find(p => p.id === id) ?? null))
-      .catch(() => setError('Failed to load project'))
-    api.updates.list(id)
-      .then(list => {
+    setLoading(true)
+    Promise.all([
+      api.projects.list(),
+      api.updates.list(id),
+      api.updates.fetchEvents(id, days),
+    ])
+      .then(([projects, list, eventsRes]) => {
+        setProject(projects.find(p => p.id === id) ?? null)
         setUpdates(list)
         if (list.length > 0) {
           setAudience(list[0].audience ?? 'engineering')
           setContext(list[0].generationContext ?? '')
         }
+        setAllEvents(eventsRes.events)
+        setFetchedDays(eventsRes.days)
       })
-      .catch(() => setError('Failed to load updates'))
-    setFetchingEvents(true)
-    api.updates.fetchEvents(id, days)
-      .then(res => { setAllEvents(res.events); setFetchedDays(res.days) })
-      .catch(() => setError('Failed to load events'))
-      .finally(() => setFetchingEvents(false))
+      .catch(() => setError('Failed to load project data'))
+      .finally(() => setLoading(false))
   }, [id])
 
   async function handleDaysChange(newDays: number) {
@@ -236,6 +238,14 @@ export default function ProjectPage() {
     { d: 30, label: 'Monthly' },
     { d: 90, label: 'Quarterly' },
   ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-96">
+        <LoadingDots className="text-brand-mid" />
+      </div>
+    )
+  }
 
   return (
     <div className="px-6 py-10 max-w-screen-xl mx-auto">
