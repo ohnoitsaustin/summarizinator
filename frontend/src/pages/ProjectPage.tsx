@@ -32,6 +32,9 @@ export default function ProjectPage() {
   const [hiddenAuthors, setHiddenAuthors] = useState<Set<string>>(new Set())
   const [highlightedAuthors, setHighlightedAuthors] = useState<Set<string>>(new Set())
   const [days, setDays] = useState(7)
+  const [customMode, setCustomMode] = useState(false)
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
   const [audience, setAudience] = useState<AudienceMode>('engineering')
   const [context, setContext] = useState('')
   const [generating, setGenerating] = useState(false)
@@ -45,13 +48,23 @@ export default function ProjectPage() {
   const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '' })
   const [savingProject, setSavingProject] = useState(false)
 
-  const since = useMemo(
-    () => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString(),
-    [days],
-  )
+  const since = useMemo(() => {
+    if (customMode && customStart) return new Date(customStart).toISOString()
+    return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+  }, [customMode, customStart, days])
+
+  const until = useMemo(() => {
+    if (customMode && customEnd) return new Date(customEnd + 'T23:59:59.999Z').toISOString()
+    return undefined
+  }, [customMode, customEnd])
+
+  const effectiveDays = customMode && customStart
+    ? Math.max(1, Math.ceil((Date.now() - new Date(customStart).getTime()) / 86400000))
+    : days
+
   const events = useMemo(
-    () => allEvents.filter(e => e.createdAt >= since),
-    [allEvents, since],
+    () => allEvents.filter(e => e.createdAt >= since && (!until || e.createdAt <= until)),
+    [allEvents, since, until],
   )
 
   useEffect(() => {
@@ -77,6 +90,7 @@ export default function ProjectPage() {
   }, [id])
 
   async function handleDaysChange(newDays: number) {
+    setCustomMode(false)
     setDays(newDays)
     if (!id || newDays <= fetchedDays) return
     setFetchingEvents(true)
@@ -84,6 +98,31 @@ export default function ProjectPage() {
       const res = await api.updates.fetchEvents(id, newDays)
       setAllEvents(res.events)
       setFetchedDays(newDays)
+    } catch {
+      setError('Failed to load events for the selected range')
+    } finally {
+      setFetchingEvents(false)
+    }
+  }
+
+  function enterCustomMode() {
+    const start = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+    const end = new Date().toISOString().slice(0, 10)
+    setCustomStart(prev => prev || start)
+    setCustomEnd(prev => prev || end)
+    setCustomMode(true)
+  }
+
+  async function handleCustomStart(start: string) {
+    setCustomStart(start)
+    if (!id || !start) return
+    const needed = Math.max(1, Math.ceil((Date.now() - new Date(start).getTime()) / 86400000))
+    if (needed <= fetchedDays) return
+    setFetchingEvents(true)
+    try {
+      const res = await api.updates.fetchEvents(id, needed)
+      setAllEvents(res.events)
+      setFetchedDays(needed)
     } catch {
       setError('Failed to load events for the selected range')
     } finally {
@@ -166,7 +205,7 @@ export default function ProjectPage() {
       const effectiveHighlightedIds = events
         .filter(e => highlightedIds.has(e.id) || highlightedAuthors.has(e.author))
         .map(e => e.id)
-      const result = await api.updates.generate(id, days, audience, context.trim() || undefined, [...hiddenIds], effectiveHighlightedIds)
+      const result = await api.updates.generate(id, effectiveDays, audience, context.trim() || undefined, [...hiddenIds], effectiveHighlightedIds)
       setActiveContent(result.content)
       setActiveEvents(result.events)
     } catch (e) {
@@ -296,7 +335,7 @@ export default function ProjectPage() {
             <div className="flex items-start gap-3 group">
               <div>
                 <h2 className="text-xl font-semibold">{project.name}</h2>
-                <p className="text-brand-accent/60 text-sm">{project.repoOwner}/{project.repoName}</p>
+                <a href={`https://github.com/${project.repoOwner}/${project.repoName}`} target="_blank" rel="noreferrer" className="text-brand-accent/60 hover:text-brand-accent text-sm transition-colors">{project.repoOwner}/{project.repoName}</a>
               </div>
               <button
                 onClick={() => { setEditForm({ name: project.name, repoOwner: project.repoOwner, repoName: project.repoName }); setEditingProject(true) }}
@@ -371,13 +410,40 @@ export default function ProjectPage() {
                     key={d}
                     onClick={() => handleDaysChange(d)}
                     disabled={fetchingEvents}
-                    className={`px-3 py-2 transition-colors disabled:opacity-50 ${days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
+                    className={`px-3 py-2 transition-colors disabled:opacity-50 ${!customMode && days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
                       } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
                   >
                     {label}
                   </button>
                 ))}
+                <button
+                  onClick={enterCustomMode}
+                  disabled={fetchingEvents}
+                  className={`px-3 py-2 border-l border-brand-mid/50 transition-colors disabled:opacity-50 ${customMode ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'}`}
+                >
+                  Custom
+                </button>
               </div>
+              {customMode && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="date"
+                    value={customStart}
+                    max={customEnd || new Date().toISOString().slice(0, 10)}
+                    onChange={e => handleCustomStart(e.target.value)}
+                    className="bg-transparent border border-brand-mid/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-mid/60 transition-colors"
+                  />
+                  <span className="text-brand-mid text-xs">to</span>
+                  <input
+                    type="date"
+                    value={customEnd}
+                    min={customStart}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={e => setCustomEnd(e.target.value)}
+                    className="bg-transparent border border-brand-mid/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-mid/60 transition-colors"
+                  />
+                </div>
+              )}
               {fetchingEvents && <LoadingDots className="text-brand-mid" />}
             </div>
           </div>

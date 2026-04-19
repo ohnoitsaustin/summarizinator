@@ -85,7 +85,7 @@ type GHRelease = {
   name: string | null
   tag_name: string
   body: string | null
-  author: { login: string }
+  author: { login: string } | null
   published_at: string | null
   html_url: string
   draft: boolean
@@ -102,7 +102,7 @@ async function fetchReleases(token: string, owner: string, repo: string, since: 
       type: 'release' as const,
       title: r.name || r.tag_name,
       body: r.body ?? undefined,
-      author: r.author.login,
+      author: r.author?.login ?? 'unknown',
       createdAt: r.published_at!,
       url: r.html_url,
     }))
@@ -128,11 +128,14 @@ export async function fetchRepoEvents(
   days: number,
 ): Promise<GithubEvent[]> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
-  const [releases, prs, issues, commits] = await Promise.all([
+  const results = await Promise.allSettled([
     fetchReleases(token, owner, repo, since),
     fetchPRs(token, owner, repo, since),
     fetchIssues(token, owner, repo, since),
     fetchCommits(token, owner, repo, since),
   ])
-  return [...releases, ...prs, ...issues, ...commits]
+  return results.flatMap(r => {
+    if (r.status === 'rejected') { console.error('fetchRepoEvents partial failure:', r.reason); return [] }
+    return r.value
+  })
 }

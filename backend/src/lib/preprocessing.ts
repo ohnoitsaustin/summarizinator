@@ -10,7 +10,9 @@ export function preprocessEvents(events: GithubEvent[]): GithubEvent[] {
   for (const event of filtered) {
     const key = event.title.toLowerCase().replace(/[^a-z0-9]/g, '')
     const existing = seen.get(key)
-    if (!existing || (event.type === 'pr_merged' && existing.type !== 'pr_merged')) {
+    const preferred = event.type === 'release' || event.type === 'pr_merged'
+    const existingPreferred = existing?.type === 'release' || existing?.type === 'pr_merged'
+    if (!existing || (preferred && !existingPreferred)) {
       seen.set(key, event)
     }
   }
