@@ -3,7 +3,7 @@ import type { GithubEvent, AudienceMode } from '../types'
 import type { RiskSignals } from './riskAnalysis'
 import { postprocessContent } from './postprocessing'
 
-const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.anthropic.claude-3-5-sonnet-20241022-v2:0'
+const MODEL_ID = process.env.BEDROCK_MODEL_ID ?? 'us.anthropic.claude-sonnet-4-5-20251001-v1:0'
 const client = new BedrockRuntimeClient({})
 
 function periodLabel(days: number): string {
