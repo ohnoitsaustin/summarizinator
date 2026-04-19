@@ -12,7 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-brand-bg text-white flex flex-col">
-      <header className="border-b border-brand-mid/50 px-6 py-4 flex items-center justify-between shrink-0">
+      <header className="border-b border-brand-light/50 px-6 py-4 flex items-center justify-between shrink-0">
         <button
           onClick={() => navigate('/dashboard')}
           className="text-lg font-semibold text-white hover:text-brand-accent transition-colors"
@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         <div className="flex items-center gap-4">
           <span className="text-brand-accent/70 text-sm">@{user?.githubLogin}</span>
-          <button onClick={handleLogout} className="text-sm text-brand-mid hover:text-white transition-colors">
+          <button onClick={handleLogout} className="text-sm text-brand-light hover:text-white transition-colors">
             Sign out
           </button>
         </div>

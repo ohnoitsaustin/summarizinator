@@ -134,7 +134,7 @@ export default function Dashboard() {
       {error && <p className="text-red-400 text-sm">{error}</p>}
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-brand-surface rounded-xl p-6 space-y-4 border border-brand-mid/50">
+        <form onSubmit={handleCreate} className="bg-brand-surface rounded-xl p-6 space-y-4 border border-brand-light/50">
           <h3 className="font-semibold">Add a project</h3>
           <div className="space-y-3">
             <input
@@ -142,7 +142,7 @@ export default function Dashboard() {
               placeholder="Project name"
               value={form.name}
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-              className="w-full bg-brand-bg border border-brand-mid/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+              className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
             />
             <div className="flex gap-2">
               <input
@@ -159,14 +159,14 @@ export default function Dashboard() {
                   const repo = text.slice(slash + 1).trim()
                   setForm(f => ({ ...f, repoOwner: owner, repoName: repo, name: f.name || repo }))
                 }}
-                className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
               />
               <input
                 required
                 placeholder="Repo (e.g. api)"
                 value={form.repoName}
                 onChange={e => setForm(f => ({ ...f, repoName: e.target.value, name: f.name || e.target.value }))}
-                className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
               />
             </div>
           </div>
@@ -181,7 +181,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-brand-mid hover:text-white text-sm transition-colors"
+              className="px-4 py-2 text-brand-light hover:text-white text-sm transition-colors"
             >
               Cancel
             </button>
@@ -190,22 +190,22 @@ export default function Dashboard() {
       )}
 
       {loading ? (
-        <p className="text-brand-mid"><LoadingDots /></p>
+        <p className="text-brand-light"><LoadingDots /></p>
       ) : projects.length === 0 && !showForm ? (
-        <p className="text-brand-mid">No projects yet. Add one to get started.</p>
+        <p className="text-brand-light">No projects yet. Add one to get started.</p>
       ) : (
         <div onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDropIndex(null) }}>
           {projects.map((p, i) => (
             <div key={p.id}>
               <div className={`h-0.5 rounded-full my-1.5 transition-colors ${dropIndex === i && draggedId !== p.id ? 'bg-brand-accent' : 'bg-transparent'}`} />
               {editingId === p.id ? (
-                <form onSubmit={handleSaveEdit} className="bg-brand-surface border border-brand-mid/50 rounded-xl px-6 py-4 space-y-3">
+                <form onSubmit={handleSaveEdit} className="bg-brand-surface border border-brand-light/50 rounded-xl px-6 py-4 space-y-3">
                   <input
                     required autoFocus
                     value={editForm.name}
                     onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                     placeholder="Project name"
-                    className="w-full bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                    className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                   />
                   <div className="flex gap-2">
                     <input
@@ -213,21 +213,21 @@ export default function Dashboard() {
                       value={editForm.repoOwner}
                       onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
                       placeholder="Owner"
-                      className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                      className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                     />
                     <input
                       required
                       value={editForm.repoName}
                       onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
                       placeholder="Repo"
-                      className="flex-1 bg-brand-bg border border-brand-mid/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-mid"
+                      className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                     />
                   </div>
                   <div className="flex gap-2">
                     <button type="submit" disabled={saving} className="px-3 py-1.5 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded-lg text-xs text-brand-bg font-medium transition-colors">
                       {saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 text-brand-mid hover:text-white text-xs transition-colors">
+                    <button type="button" onClick={() => setEditingId(null)} className="px-3 py-1.5 text-brand-light hover:text-white text-xs transition-colors">
                       Cancel
                     </button>
                   </div>
@@ -241,7 +241,7 @@ export default function Dashboard() {
                   onDragEnd={handleDragEnd}
                   className={`flex items-center gap-2 group transition-opacity ${draggedId === p.id ? 'opacity-40' : 'opacity-100'}`}
                 >
-                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-brand-mid/30 group-hover:text-brand-mid/60 transition-colors px-1 select-none">
+                  <div className="shrink-0 cursor-grab active:cursor-grabbing text-brand-light/30 group-hover:text-brand-light/60 transition-colors px-1 select-none">
                     ⠿
                   </div>
                   <div className="flex-1">
@@ -249,7 +249,7 @@ export default function Dashboard() {
                   </div>
                   <button
                     onClick={() => startEdit(p)}
-                    className="shrink-0 px-1 text-brand-mid/30 hover:text-brand-mid transition-colors text-sm"
+                    className="shrink-0 px-1 text-brand-light/30 hover:text-brand-light transition-colors text-sm"
                     title="Edit project"
                   >
                     ✎

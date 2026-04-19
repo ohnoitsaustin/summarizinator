@@ -42,20 +42,12 @@ const TYPE_LABELS: Record<GithubEvent['type'], string> = {
   commit: 'Commit',
 }
 
-const TYPE_MORE_LABELS: Record<GithubEvent['type'], string> = {
-  release: 'releases',
-  pr_merged: 'merged PRs',
-  pr_opened: 'open PRs',
-  issue_closed: 'closed issues',
-  issue_opened: 'open issues',
-  commit: 'commits',
-}
 
 const TYPE_COLORS: Record<GithubEvent['type'], string> = {
   release: 'bg-purple-900/60 text-purple-300',
   pr_merged: 'bg-emerald-900/60 text-emerald-300',
   pr_opened: 'bg-blue-900/60 text-blue-300',
-  issue_closed: 'bg-brand-mid/60 text-brand-accent',
+  issue_closed: 'bg-brand-light/60 text-brand-accent',
   issue_opened: 'bg-yellow-900/60 text-yellow-300',
   commit: 'bg-brand-surface text-brand-accent/70',
 }
@@ -79,20 +71,20 @@ function AuthorChip({ author, count, hiddenAuthors, highlightedAuthors, onToggle
   const highlighted = highlightedAuthors.has(author)
   return (
     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs transition-colors ${
-      hidden ? 'border-brand-mid/20 opacity-40 bg-brand-surface/20'
+      hidden ? 'border-brand-light/20 opacity-40 bg-brand-surface/20'
       : highlighted ? 'border-brand-accent/60 bg-brand-surface/60'
-      : 'border-brand-mid/40 bg-brand-surface/30'
+      : 'border-brand-light/40 bg-brand-surface/30'
     }`}>
-      <span className={hidden ? 'line-through text-brand-mid' : 'text-brand-accent/90'}>
+      <span className={hidden ? 'line-through text-brand-light' : 'text-brand-accent/90'}>
         @{author}
       </span>
-      <span className="text-brand-mid/50">{count}</span>
+      <span className="text-brand-light/50">{count}</span>
       <button onClick={() => onToggleHighlight(author)} disabled={hidden} title={highlighted ? 'Remove emphasis' : 'Emphasize'}
-        className={`leading-none transition-colors disabled:opacity-30 ${highlighted ? 'text-yellow-400' : 'text-brand-mid hover:text-yellow-400'}`}>
+        className={`leading-none transition-colors disabled:opacity-30 ${highlighted ? 'text-yellow-400' : 'text-brand-light hover:text-yellow-400'}`}>
         ★
       </button>
       <button onClick={() => onToggleHide(author)} title={hidden ? 'Show' : 'Hide'}
-        className={`leading-none transition-colors ${hidden ? 'text-brand-mid hover:text-brand-accent' : 'text-brand-mid hover:text-red-400'}`}>
+        className={`leading-none transition-colors ${hidden ? 'text-brand-light hover:text-brand-accent' : 'text-brand-light hover:text-red-400'}`}>
         {hidden ? '👁' : '🚫'}
       </button>
     </div>
@@ -118,10 +110,10 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
     <div
       ref={el => { if (el) itemRefs.current.set(event.id, el); else itemRefs.current.delete(event.id) }}
       className={`px-3 py-2 rounded-lg border transition-colors ${
-        hidden ? 'border-brand-mid/20 opacity-40'
+        hidden ? 'border-brand-light/20 opacity-40'
         : superHighlighted ? 'border-yellow-400/70 bg-brand-surface/70'
         : highlighted ? 'border-brand-accent/50 bg-brand-surface/50'
-        : 'border-brand-mid/30 bg-brand-surface/20'
+        : 'border-brand-light/30 bg-brand-surface/20'
       }`}
     >
       <div className="flex items-center gap-2">
@@ -137,20 +129,20 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
           onMouseEnter={() => enterDrag(event.id, 'highlight')}
           disabled={authorHidden || hiddenIds.has(event.id)}
           title={highlightedIds.has(event.id) ? 'Remove emphasis' : 'Emphasize'}
-          className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${highlightedIds.has(event.id) ? 'text-yellow-400' : 'text-brand-mid hover:text-yellow-400'}`}
+          className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${highlightedIds.has(event.id) ? 'text-yellow-400' : 'text-brand-light hover:text-yellow-400'}`}
         >★</button>
         <button
           onMouseDown={e => { if (!authorHidden) startDrag(event.id, 'hide', e) }}
           onMouseEnter={() => enterDrag(event.id, 'hide')}
           disabled={authorHidden}
           title={hiddenIds.has(event.id) ? 'Show' : 'Hide'}
-          className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${hiddenIds.has(event.id) ? 'text-brand-mid hover:text-brand-accent' : 'text-brand-mid hover:text-red-400'}`}
+          className={`shrink-0 text-base leading-none transition-colors disabled:opacity-30 cursor-pointer ${hiddenIds.has(event.id) ? 'text-brand-light hover:text-brand-accent' : 'text-brand-light hover:text-red-400'}`}
         >{hiddenIds.has(event.id) ? '👁' : '🚫'}</button>
       </div>
       <div className="flex items-center gap-2 mt-1">
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[event.type]}`}>{TYPE_LABELS[event.type]}</span>
-        <span className="text-xs text-brand-mid">@{event.author}</span>
-        <span className="text-xs text-brand-mid/60" title={new Date(event.createdAt).toLocaleString()}>
+        <span className="text-xs text-brand-light">@{event.author}</span>
+        <span className="text-xs text-brand-light/60" title={new Date(event.createdAt).toLocaleString()}>
           {new Date(event.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           {' '}
           {new Date(event.createdAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
@@ -277,21 +269,21 @@ export default function EventList({
 
   return (
     <div className="space-y-3 select-none">
-      <p className="text-brand-mid text-xs">{authors.length} contributor{authors.length !== 1 ? 's' : ''} in the last {days} days</p>
+      <p className="text-brand-light text-xs">{authors.length} contributor{authors.length !== 1 ? 's' : ''} over {days} days</p>
 
       {/* Author filter bar */}
       <div className="relative" onMouseEnter={() => setShowOverflow(true)} onMouseLeave={() => setShowOverflow(false)}>
         <div className="flex flex-wrap gap-2">
           {visibleAuthors.map(author => <AuthorChip key={author} author={author} count={authorCounts.get(author)!} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} onToggleHide={onToggleHideAuthor} onToggleHighlight={onToggleHighlightAuthor} />)}
           {overflowAuthors.length > 0 && (
-            <button className="px-2.5 py-1 rounded-full border border-brand-mid/40 bg-brand-surface/30 text-xs text-brand-mid hover:text-brand-accent transition-colors">
+            <button className="px-2.5 py-1 rounded-full border border-brand-light/40 bg-brand-surface/30 text-xs text-brand-light hover:text-brand-accent transition-colors">
               +{overflowAuthors.length} more
             </button>
           )}
         </div>
         {showOverflow && overflowAuthors.length > 0 && (
           <div className="absolute left-0 right-0 top-full z-20 pt-1">
-            <div className="bg-brand-bg border border-brand-mid/30 rounded-lg p-3 flex flex-wrap gap-2 shadow-lg">
+            <div className="bg-brand-bg border border-brand-light/30 rounded-lg p-3 flex flex-wrap gap-2 shadow-lg">
               {overflowAuthors.map(author => <AuthorChip key={author} author={author} count={authorCounts.get(author)!} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} onToggleHide={onToggleHideAuthor} onToggleHighlight={onToggleHighlightAuthor} />)}
             </div>
           </div>
@@ -304,7 +296,7 @@ export default function EventList({
         value={search}
         onChange={e => setSearch(e.target.value)}
         placeholder="Search events or authors…"
-        className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-1.5 text-sm text-brand-accent placeholder-brand-mid/40 focus:outline-none focus:border-brand-mid/60 transition-colors"
+        className="w-full bg-transparent border border-brand-light/30 rounded px-3 py-1.5 text-sm text-brand-accent placeholder-brand-light/40 focus:outline-none focus:border-brand-light/60 transition-colors"
       />
 
       {/* Event rows */}
@@ -325,11 +317,11 @@ export default function EventList({
         return (
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-brand-mid flex-1">
+              <span className="text-brand-light flex-1">
                 {searchPool ? `${searchPool.length} matching` : events.length} events
               </span>
-              <button onClick={() => onBulkHighlight(globalIds, !allHL)} title={allHL ? 'Remove highlight from all' : 'Highlight all'} className={`leading-none transition-colors ${allHL ? 'text-yellow-400 hover:text-brand-mid' : 'text-brand-mid hover:text-yellow-400'}`}>★ {allHL ? 'unhighlight' : 'highlight'} all</button>
-              <button onClick={() => onBulkHide(globalIds, !allHid)} title={allHid ? 'Show all' : 'Hide all'} className={`leading-none transition-colors ${allHid ? 'text-brand-mid hover:text-brand-accent' : 'text-brand-mid hover:text-red-400'}`}>{allHid ? '👁' : '🚫'} {allHid ? 'show' : 'hide'} all</button>
+              <button onClick={() => onBulkHighlight(globalIds, !allHL)} title={allHL ? 'Remove highlight from all' : 'Highlight all'} className={`leading-none transition-colors ${allHL ? 'text-yellow-400 hover:text-brand-light' : 'text-brand-light hover:text-yellow-400'}`}>★ {allHL ? 'unhighlight' : 'highlight'} all</button>
+              <button onClick={() => onBulkHide(globalIds, !allHid)} title={allHid ? 'Show all' : 'Hide all'} className={`leading-none transition-colors ${allHid ? 'text-brand-light hover:text-brand-accent' : 'text-brand-light hover:text-red-400'}`}>{allHid ? '👁' : '🚫'} {allHid ? 'show' : 'hide'} all</button>
             </div>
 
             {searchPool !== null
@@ -344,15 +336,18 @@ export default function EventList({
                   const typeHL = typeIds.length > 0 && typeIds.every((id: string) => highlightedIds.has(id))
                   const typeHid = typeIds.length > 0 && typeIds.every((id: string) => hiddenIds.has(id))
                   return [
+                    <div key={`header-${type}`} className="flex items-center justify-between px-1 pt-3 pb-1">
+                      <span className="text-xs font-semibold text-brand-light/70 uppercase tracking-wide">{TYPE_LABELS[type]}</span>
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => onBulkHighlight(typeIds, !typeHL)} title={typeHL ? 'Remove highlight' : 'Highlight all'} className={`text-sm leading-none transition-colors ${typeHL ? 'text-yellow-400 hover:text-brand-light' : 'text-brand-light/50 hover:text-yellow-400'}`}>★</button>
+                        <button onClick={() => onBulkHide(typeIds, !typeHid)} title={typeHid ? 'Show all' : 'Hide all'} className={`text-sm leading-none transition-colors ${typeHid ? 'text-brand-light hover:text-brand-accent' : 'text-brand-light/50 hover:text-red-400'}`}>{typeHid ? '👁' : '🚫'}</button>
+                      </div>
+                    </div>,
                     ...shown.map(event => <EventRow key={event.id} event={event} hiddenIds={hiddenIds} highlightedIds={highlightedIds} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} itemRefs={itemRefs} startDrag={startDrag} enterDrag={enterDrag} />),
                     ...(hiddenCount > 0 ? [
-                      <div key={`expand-${type}`} className="flex items-center gap-1 pl-1 py-0.5">
-                        <button onClick={() => onBulkHighlight(typeIds, !typeHL)} title={typeHL ? 'Remove highlight' : 'Highlight all'} className={`text-base leading-none transition-colors ${typeHL ? 'text-yellow-400 hover:text-brand-mid' : 'text-brand-mid hover:text-yellow-400'}`}>★</button>
-                        <button onClick={() => onBulkHide(typeIds, !typeHid)} title={typeHid ? 'Show all' : 'Hide all'} className={`text-base leading-none transition-colors ${typeHid ? 'text-brand-mid hover:text-brand-accent' : 'text-brand-mid hover:text-red-400'}`}>{typeHid ? '👁' : '🚫'}</button>
-                        <button onClick={() => setExpandedTypes(prev => { const next = new Set(prev); next.add(type); return next })} className="text-xs text-brand-mid hover:text-brand-accent transition-colors ml-1">
-                          +{hiddenCount} more {TYPE_MORE_LABELS[type]}
-                        </button>
-                      </div>
+                      <button key={`expand-${type}`} onClick={() => setExpandedTypes(prev => { const next = new Set(prev); next.add(type); return next })} className="text-xs text-brand-light/50 hover:text-brand-accent transition-colors pl-1 py-0.5">
+                        show all
+                      </button>
                     ] : []),
                   ]
                 })

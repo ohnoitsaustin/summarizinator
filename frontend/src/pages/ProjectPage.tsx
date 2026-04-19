@@ -6,6 +6,7 @@ import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
 import PastUpdateCard from '../components/PastUpdateCard'
 import LoadingDots from '../components/LoadingDots'
+import GeneratingSkeleton from '../components/GeneratingSkeleton'
 
 const AUDIENCE_OPTIONS: { value: AudienceMode; label: string }[] = [
   { value: 'engineering', label: 'Engineering' },
@@ -59,7 +60,9 @@ export default function ProjectPage() {
   }, [customMode, customEnd])
 
   const effectiveDays = customMode && customStart
-    ? Math.max(1, Math.ceil((Date.now() - new Date(customStart).getTime()) / 86400000))
+    ? Math.max(1, Math.ceil(
+        (new Date(customEnd || new Date().toISOString().slice(0, 10)).getTime() - new Date(customStart).getTime()) / 86400000
+      ))
     : days
 
   const events = useMemo(
@@ -287,7 +290,7 @@ export default function ProjectPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-96">
-        <LoadingDots className="text-brand-mid" />
+        <LoadingDots className="text-brand-light" />
       </div>
     )
   }
@@ -303,7 +306,7 @@ export default function ProjectPage() {
                 value={editForm.name}
                 onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="Project name"
-                className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-xl font-semibold focus:outline-none w-64 transition-colors block"
+                className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-xl font-semibold focus:outline-none w-64 transition-colors block"
               />
               <div className="flex items-center gap-1">
                 <input
@@ -311,7 +314,7 @@ export default function ProjectPage() {
                   value={editForm.repoOwner}
                   onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
                   placeholder="owner"
-                  className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                  className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
                 />
                 <span className="text-brand-accent/40 text-sm">/</span>
                 <input
@@ -319,14 +322,14 @@ export default function ProjectPage() {
                   value={editForm.repoName}
                   onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
                   placeholder="repo"
-                  className="bg-transparent border-b border-brand-mid/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                  className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
                 />
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={savingProject} className="px-2.5 py-1 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded text-xs text-brand-bg font-medium transition-colors">
                   {savingProject ? 'Saving…' : 'Save'}
                 </button>
-                <button type="button" onClick={() => setEditingProject(false)} className="px-2 py-1 text-brand-mid hover:text-white text-xs transition-colors">
+                <button type="button" onClick={() => setEditingProject(false)} className="px-2 py-1 text-brand-light hover:text-white text-xs transition-colors">
                   Cancel
                 </button>
               </div>
@@ -339,7 +342,7 @@ export default function ProjectPage() {
               </div>
               <button
                 onClick={() => { setEditForm({ name: project.name, repoOwner: project.repoOwner, repoName: project.repoName }); setEditingProject(true) }}
-                className="mt-1 text-brand-mid/30 hover:text-brand-mid opacity-0 group-hover:opacity-100 transition-all text-sm"
+                className="mt-1 text-brand-light/30 hover:text-brand-light opacity-0 group-hover:opacity-100 transition-all text-sm"
                 title="Edit project"
               >
                 ✎
@@ -350,13 +353,12 @@ export default function ProjectPage() {
       )}
 
       {error && <p className="text-red-400 text-sm mb-6">{error}</p>}
-
       <div className="flex flex-col lg:flex-row lg:gap-8">
         {events.length > 0 && (
           <div className="lg:w-1/3 shrink-0 mb-6 lg:mb-0 lg:self-start lg:sticky lg:top-6">
             <EventList
               events={events}
-              days={days}
+              days={effectiveDays}
               hiddenIds={hiddenIds}
               highlightedIds={highlightedIds}
               hiddenAuthors={hiddenAuthors}
@@ -374,14 +376,14 @@ export default function ProjectPage() {
         <div className="flex-1 min-w-0 space-y-6">
           <div className="space-y-3">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-brand-mid/70 shrink-0">Audience</span>
-              <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+              <span className="text-xs text-brand-light/70 shrink-0">Audience</span>
+              <div className="flex rounded overflow-hidden border border-brand-light/50 text-xs">
                 {AUDIENCE_OPTIONS.map(({ value, label }, i) => (
                   <button
                     key={value}
                     onClick={() => setAudience(value)}
-                    className={`px-3 py-2 transition-colors ${audience === value ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                      } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+                    className={`px-3 py-2 transition-colors ${audience === value ? 'bg-brand-light/40 text-white' : 'text-brand-light hover:text-white'
+                      } ${i > 0 ? 'border-l border-brand-light/50' : ''}`}
                   >
                     {label}
                   </button>
@@ -394,7 +396,7 @@ export default function ProjectPage() {
               onChange={e => setContext(e.target.value)}
               maxLength={1000}
               placeholder="Additional context (optional) — release timing, staffing changes, shifted priorities, known blockers..."
-              className="w-full bg-transparent border border-brand-mid/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-mid/40 resize-none focus:outline-none focus:border-brand-mid/60 transition-colors"
+              className="w-full bg-transparent border border-brand-light/30 rounded px-3 py-2 text-sm text-brand-accent placeholder-brand-light/40 resize-none focus:outline-none focus:border-brand-light/60 transition-colors"
               rows={2}
             />
 
@@ -404,14 +406,14 @@ export default function ProjectPage() {
                 loading={generating}
                 allHidden={events.length > 0 && events.every(e => hiddenIds.has(e.id) || hiddenAuthors.has(e.author))}
               />
-              <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+              <div className="flex rounded overflow-hidden border border-brand-light/50 text-xs">
                 {SPAN_OPTIONS.map(({ d, label }, i) => (
                   <button
                     key={d}
                     onClick={() => handleDaysChange(d)}
                     disabled={fetchingEvents}
-                    className={`px-3 py-2 transition-colors disabled:opacity-50 ${!customMode && days === d ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'
-                      } ${i > 0 ? 'border-l border-brand-mid/50' : ''}`}
+                    className={`px-3 py-2 transition-colors disabled:opacity-50 ${!customMode && days === d ? 'bg-brand-light/40 text-white' : 'text-brand-light hover:text-white'
+                      } ${i > 0 ? 'border-l border-brand-light/50' : ''}`}
                   >
                     {label}
                   </button>
@@ -419,7 +421,7 @@ export default function ProjectPage() {
                 <button
                   onClick={enterCustomMode}
                   disabled={fetchingEvents}
-                  className={`px-3 py-2 border-l border-brand-mid/50 transition-colors disabled:opacity-50 ${customMode ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'}`}
+                  className={`px-3 py-2 border-l border-brand-light/50 transition-colors disabled:opacity-50 ${customMode ? 'bg-brand-light/40 text-white' : 'text-brand-light hover:text-white'}`}
                 >
                   Custom
                 </button>
@@ -431,24 +433,26 @@ export default function ProjectPage() {
                     value={customStart}
                     max={customEnd || new Date().toISOString().slice(0, 10)}
                     onChange={e => handleCustomStart(e.target.value)}
-                    className="bg-transparent border border-brand-mid/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-mid/60 transition-colors"
+                    className="bg-transparent border border-brand-light/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-light/60 transition-colors"
                   />
-                  <span className="text-brand-mid text-xs">to</span>
+                  <span className="text-brand-light text-xs">to</span>
                   <input
                     type="date"
                     value={customEnd}
                     min={customStart}
                     max={new Date().toISOString().slice(0, 10)}
                     onChange={e => setCustomEnd(e.target.value)}
-                    className="bg-transparent border border-brand-mid/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-mid/60 transition-colors"
+                    className="bg-transparent border border-brand-light/30 rounded px-2 py-1 text-sm text-brand-accent focus:outline-none focus:border-brand-light/60 transition-colors"
                   />
                 </div>
               )}
-              {fetchingEvents && <LoadingDots className="text-brand-mid" />}
+              {fetchingEvents && <LoadingDots className="text-brand-light" />}
             </div>
           </div>
 
-          {activeContent && (
+          {generating && <GeneratingSkeleton />}
+
+          {activeContent && !generating && (
             <>
               <UpdateEditor
                 content={activeContent}
@@ -462,7 +466,7 @@ export default function ProjectPage() {
                     value={saveName}
                     onChange={e => setSaveName(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setShowSave(false) }}
-                    className="flex-1 bg-transparent border border-brand-mid/50 rounded px-3 py-1.5 text-sm text-brand-accent placeholder-brand-mid/40 focus:outline-none focus:border-brand-mid transition-colors"
+                    className="flex-1 bg-transparent border border-brand-light/50 rounded px-3 py-1.5 text-sm text-brand-accent placeholder-brand-light/40 focus:outline-none focus:border-brand-light transition-colors"
                     placeholder="Update name"
                   />
                   <button
@@ -474,7 +478,7 @@ export default function ProjectPage() {
                   </button>
                   <button
                     onClick={() => setShowSave(false)}
-                    className="px-3 py-1.5 text-brand-mid text-xs hover:text-white transition-colors"
+                    className="px-3 py-1.5 text-brand-light text-xs hover:text-white transition-colors"
                   >
                     Cancel
                   </button>
@@ -482,7 +486,7 @@ export default function ProjectPage() {
               ) : (
                 <button
                   onClick={openSave}
-                  className="text-xs text-brand-mid hover:text-brand-accent transition-colors"
+                  className="text-xs text-brand-light hover:text-brand-accent transition-colors"
                 >
                   Save to archive
                 </button>
@@ -492,7 +496,7 @@ export default function ProjectPage() {
 
           {updates.length > 0 && (
             <div className="space-y-2">
-              <p className="text-brand-mid text-sm">Archive</p>
+              <p className="text-brand-light text-sm">Archive</p>
               {updates.map(u => (
                 <PastUpdateCard
                   key={u.id}

@@ -54,12 +54,12 @@ export default function PastUpdateCard({ update, onSave, onDelete }: Props) {
 
   if (pendingDelete) {
     return (
-      <div className="relative overflow-hidden flex items-center justify-between px-4 py-3 border border-brand-mid/30 rounded-lg text-sm bg-brand-surface/20 opacity-60">
+      <div className="relative overflow-hidden flex items-center justify-between px-4 py-3 border border-brand-light/30 rounded-lg text-sm bg-brand-surface/20 opacity-60">
         <div
           className="absolute inset-0 bg-red-900/20 origin-left transition-none"
           style={{ transform: `scaleX(${undoProgress / 100})` }}
         />
-        <span className="relative text-brand-mid">{dateLabel} — deleted</span>
+        <span className="relative text-brand-light">{dateLabel} — deleted</span>
         <button onClick={handleUndo} className="relative text-xs text-brand-accent hover:text-white transition-colors">
           Undo
         </button>
@@ -68,31 +68,31 @@ export default function PastUpdateCard({ update, onSave, onDelete }: Props) {
   }
 
   return (
-    <div className="border border-brand-mid/50 rounded-lg overflow-hidden">
+    <div className="border border-brand-light/50 rounded-lg overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 bg-brand-surface/20">
         <button
           onClick={() => { setExpanded(v => !v); if (editing) setEditing(false) }}
           className="flex-1 text-left text-sm text-brand-accent/70 flex items-center gap-2 hover:text-brand-accent transition-colors"
         >
-          <span className={`text-brand-mid text-xs transition-transform inline-block ${expanded ? 'rotate-90' : ''}`}>▶</span>
+          <span className={`text-brand-light text-xs transition-transform inline-block ${expanded ? 'rotate-90' : ''}`}>▶</span>
           {dateLabel}
         </button>
         <button
           onClick={handleEdit}
-          className="text-xs text-brand-mid hover:text-white transition-colors px-2 py-1"
+          className="text-xs text-brand-light hover:text-white transition-colors px-2 py-1"
         >
           Edit
         </button>
         <button
           onClick={startDelete}
-          className="text-xs text-brand-mid hover:text-red-400 transition-colors px-2 py-1"
+          className="text-xs text-brand-light hover:text-red-400 transition-colors px-2 py-1"
         >
           Delete
         </button>
       </div>
 
       {expanded && (
-        <div className="border-t border-brand-mid/30">
+        <div className="border-t border-brand-light/30">
           {editing ? (
             <div className="p-3 space-y-2">
               <textarea
@@ -109,7 +109,7 @@ export default function PastUpdateCard({ update, onSave, onDelete }: Props) {
                 </button>
                 <button
                   onClick={() => setEditing(false)}
-                  className="px-3 py-1 text-brand-mid text-xs hover:text-white transition-colors"
+                  className="px-3 py-1 text-brand-light text-xs hover:text-white transition-colors"
                 >
                   Cancel
                 </button>

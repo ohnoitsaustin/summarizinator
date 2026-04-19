@@ -11,19 +11,19 @@ export default function UpdateEditor({ content, onChange }: Props) {
   const [mode, setMode] = useState<'edit' | 'preview'>('preview')
 
   return (
-    <div className="rounded-xl border border-brand-mid/50 overflow-hidden">
-      <div className="flex items-center justify-between px-3 py-2 bg-brand-surface border-b border-brand-mid/50">
+    <div className="rounded-xl border border-brand-light/50 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-brand-surface border-b border-brand-light/50">
         <CopyButton text={content} />
-        <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
+        <div className="flex rounded overflow-hidden border border-brand-light/50 text-xs">
           <button
             onClick={() => setMode('edit')}
-            className={`px-3 py-1 transition-colors ${mode === 'edit' ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'}`}
+            className={`px-3 py-1 transition-colors ${mode === 'edit' ? 'bg-brand-light/40 text-white' : 'text-brand-light hover:text-white'}`}
           >
             Markdown
           </button>
           <button
             onClick={() => setMode('preview')}
-            className={`px-3 py-1 transition-colors ${mode === 'preview' ? 'bg-brand-mid/40 text-white' : 'text-brand-mid hover:text-white'}`}
+            className={`px-3 py-1 transition-colors ${mode === 'preview' ? 'bg-brand-light/40 text-white' : 'text-brand-light hover:text-white'}`}
           >
             Preview
           </button>
