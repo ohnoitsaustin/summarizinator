@@ -23,6 +23,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     const body = JSON.parse(event.body ?? '{}') as { code?: string }
     if (!body.code) return err(400, 'Missing code')
 
+    console.log('client_id bytes:', JSON.stringify(GITHUB_CLIENT_ID))
     const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
       headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
@@ -33,7 +34,10 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       }),
     })
     const tokenData = await tokenRes.json() as { access_token?: string }
-    if (!tokenData.access_token) return err(401, 'GitHub authentication failed')
+    if (!tokenData.access_token) {
+      console.error('GitHub token exchange failed:', tokenData)
+      return err(401, 'GitHub authentication failed')
+    }
 
     const [ghUser, emails] = await Promise.all([
       fetch('https://api.github.com/user', {

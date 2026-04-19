@@ -8,7 +8,7 @@ type Props = {
 }
 
 export default function UpdateEditor({ content, onChange }: Props) {
-  const [mode, setMode] = useState<'edit' | 'preview'>('edit')
+  const [mode, setMode] = useState<'edit' | 'preview'>('preview')
 
   return (
     <div className="rounded-xl border border-brand-mid/50 overflow-hidden">
