@@ -128,29 +128,6 @@ export default function ProjectPage() {
     setHighlightedAuthors(new Set())
   }
 
-  function effectiveHiddenIds() {
-    return new Set([
-      ...hiddenIds,
-      ...events.filter(e => hiddenAuthors.has(e.author)).map(e => e.id),
-    ])
-  }
-
-  function effectiveHighlightedIds() {
-    const hidden = effectiveHiddenIds()
-    return new Set([
-      ...highlightedIds,
-      ...events.filter(e => highlightedAuthors.has(e.author) && !hidden.has(e.id)).map(e => e.id),
-    ])
-  }
-
-  function curatedEvents(): GithubEvent[] {
-    const hidden = effectiveHiddenIds()
-    const highlighted = effectiveHighlightedIds()
-    return events
-      .filter(e => !hidden.has(e.id))
-      .map(e => ({ ...e, highlighted: highlighted.has(e.id) || undefined }))
-  }
-
   async function handleGenerate() {
     if (!id) return
     setGenerating(true)
@@ -165,21 +142,6 @@ export default function ProjectPage() {
       setFetchedDays(days)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Generation failed')
-    } finally {
-      setGenerating(false)
-    }
-  }
-
-  async function handleRegenerate() {
-    if (!id) return
-    setGenerating(true)
-    setError(null)
-    setShowSave(false)
-    try {
-      const result = await api.updates.regenerate(id, curatedEvents(), days, audience, context.trim() || undefined)
-      setActiveContent(result.content)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Regeneration failed')
     } finally {
       setGenerating(false)
     }
@@ -326,8 +288,6 @@ export default function ProjectPage() {
               <UpdateEditor
                 content={activeContent}
                 onChange={setActiveContent}
-                onRegenerate={handleRegenerate}
-                regenerating={generating}
               />
 
               {showSave ? (

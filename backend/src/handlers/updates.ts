@@ -71,26 +71,6 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   return ok({ content, events, audience, generationContext: context })
 }
 
-async function handleRegenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
-  const body = JSON.parse(event.body ?? '{}') as {
-    projectId?: string
-    events?: GithubEvent[]
-    days?: number
-    audience?: unknown
-    context?: string
-  }
-  if (!body.projectId || !Array.isArray(body.events)) return err(400, 'Missing projectId or events')
-
-  const project = await getProject(userId, body.projectId)
-  if (!project) return err(404, 'Project not found')
-
-  const audience = parseAudience(body.audience)
-  const context = body.context?.trim() || undefined
-  const signals = analyzeRisks(body.events, context)
-  const content = await generateUpdate(body.events, body.days ?? 7, audience, context, signals)
-
-  return ok({ content })
-}
 
 async function handleSaveUpdate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
   const body = JSON.parse(event.body ?? '{}') as {
@@ -198,8 +178,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
   try {
     const route = event.routeKey
     if (route === 'POST /api/updates/generate') return handleGenerate(event, user.sub)
-    if (route === 'POST /api/updates/regenerate') return handleRegenerate(event, user.sub)
-    if (route === 'POST /api/updates/save') return handleSaveUpdate(event, user.sub)
+if (route === 'POST /api/updates/save') return handleSaveUpdate(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, user.sub)
     if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, user.sub)
     if (route === 'DELETE /api/updates/{id}') return handleDeleteUpdate(event, user.sub)

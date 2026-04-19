@@ -1,33 +1,19 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import CopyButton from './CopyButton'
-import LoadingDots from './LoadingDots'
 
 type Props = {
   content: string
   onChange: (v: string) => void
-  onRegenerate?: () => void
-  regenerating?: boolean
 }
 
-export default function UpdateEditor({ content, onChange, onRegenerate, regenerating }: Props) {
+export default function UpdateEditor({ content, onChange }: Props) {
   const [mode, setMode] = useState<'edit' | 'preview'>('edit')
 
   return (
     <div className="rounded-xl border border-brand-mid/50 overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 bg-brand-surface border-b border-brand-mid/50">
-        <div className="flex items-center gap-2">
-          {onRegenerate && (
-            <button
-              onClick={onRegenerate}
-              disabled={regenerating}
-              className="px-3 py-1 border border-brand-mid/50 hover:border-brand-accent disabled:opacity-50 rounded text-xs transition-colors"
-            >
-              {regenerating ? <LoadingDots /> : 'Regenerate'}
-            </button>
-          )}
-          <CopyButton text={content} />
-        </div>
+        <CopyButton text={content} />
         <div className="flex rounded overflow-hidden border border-brand-mid/50 text-xs">
           <button
             onClick={() => setMode('edit')}

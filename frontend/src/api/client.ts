@@ -53,7 +53,6 @@ type GenerateResult = {
   generationContext?: string
 }
 
-type RegenerateResult = { content: string }
 
 export const api = {
   auth: {
@@ -73,11 +72,6 @@ export const api = {
       request<GenerateResult>('/api/updates/generate', {
         method: 'POST',
         body: JSON.stringify({ projectId, days, audience, context }),
-      }),
-    regenerate: (projectId: string, events: GithubEvent[], days: number, audience: AudienceMode, context?: string) =>
-      request<RegenerateResult>('/api/updates/regenerate', {
-        method: 'POST',
-        body: JSON.stringify({ projectId, events, days, audience, context }),
       }),
     save: (projectId: string, name: string, content: string, rawEvents: GithubEvent[], audience: AudienceMode, context?: string) =>
       request<UpdateSummary>('/api/updates/save', {
