@@ -66,7 +66,7 @@ export class SummarizinatorStack extends cdk.Stack {
         fullname: { required: false, mutable: true },
       },
       passwordPolicy: {
-        minLength: 8,
+        minLength: 14,
         requireLowercase: false,
         requireUppercase: false,
         requireDigits: false,
@@ -130,6 +130,8 @@ export class SummarizinatorStack extends cdk.Stack {
 
     const githubClientId = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-id`)
     const githubClientSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-secret`)
+    const jiraClientId = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/jira-client-id`)
+    const jiraClientSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/jira-client-secret`)
 
     const handlerDir = path.join(__dirname, '../../backend/src/handlers')
 
@@ -155,6 +157,8 @@ export class SummarizinatorStack extends cdk.Stack {
         ...lambdaDefaults.environment,
         GITHUB_CLIENT_ID: githubClientId,
         GITHUB_CLIENT_SECRET: githubClientSecret,
+        JIRA_CLIENT_ID: jiraClientId,
+        JIRA_CLIENT_SECRET: jiraClientSecret,
       },
     })
     table.grantReadWriteData(connectionsFn)
@@ -172,7 +176,7 @@ export class SummarizinatorStack extends cdk.Stack {
       entry: path.join(handlerDir, 'updates.ts'),
       timeout: cdk.Duration.seconds(60),
       bundling: { ...lambdaDefaults.bundling, externalModules: ['@aws-sdk/client-dynamodb', '@aws-sdk/lib-dynamodb'] },
-      environment: { ...lambdaDefaults.environment, BEDROCK_MODEL_ID },
+      environment: { ...lambdaDefaults.environment, BEDROCK_MODEL_ID, JIRA_CLIENT_ID: jiraClientId, JIRA_CLIENT_SECRET: jiraClientSecret },
     })
     table.grantReadWriteData(updatesFn)
     updatesFn.addToRolePolicy(new iam.PolicyStatement({
@@ -212,6 +216,7 @@ export class SummarizinatorStack extends cdk.Stack {
 
     api.addRoutes({ path: '/api/connections', methods: [apigwv2.HttpMethod.GET], integration: connectionsInt, authorizer })
     api.addRoutes({ path: '/api/connections/github', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST, apigwv2.HttpMethod.DELETE], integration: connectionsInt, authorizer })
+    api.addRoutes({ path: '/api/connections/jira', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST, apigwv2.HttpMethod.DELETE], integration: connectionsInt, authorizer })
     api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: projectsInt, authorizer })
     api.addRoutes({ path: '/api/projects/{id}', methods: [apigwv2.HttpMethod.PATCH], integration: projectsInt, authorizer })
     api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: updatesInt, authorizer })

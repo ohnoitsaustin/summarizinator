@@ -1,13 +1,12 @@
-import type { GithubEvent } from '../types'
+import type { Event } from '../types'
 
 export type RiskSignals = {
-  mergedPrCount: number
-  openPrCount: number
-  openedIssueCount: number
-  closedIssueCount: number
-  commitCount: number
-  staleOpenPrCount: number
-  staleOpenIssueCount: number
+  completedCount: number
+  inProgressCount: number
+  createdCount: number
+  updatedCount: number
+  blockedCount: number
+  staleCount: number
   hasHighWorkInProgress: boolean
   hasReviewBottleneck: boolean
   hasLowCompletionSignal: boolean
@@ -20,7 +19,7 @@ export type RiskSignals = {
 const RISK_KEYWORDS = ['blocked', 'waiting', 'approval', 'follow-up', 'refactor', 'urgent', 'hotfix', 'spike', 'support', 'investigate']
 const STALE_DAYS = 3
 
-function ageInDays(event: GithubEvent, now: Date): number {
+function ageInDays(event: Event, now: Date): number {
   return (now.getTime() - new Date(event.createdAt).getTime()) / (1000 * 60 * 60 * 24)
 }
 
@@ -28,45 +27,46 @@ function significantWords(title: string): string[] {
   return title.toLowerCase().replace(/[^a-z0-9 ]/g, '').split(/\s+/).filter(w => w.length > 3)
 }
 
-export function analyzeRisks(events: GithubEvent[], userContext?: string): RiskSignals {
+export function analyzeRisks(events: Event[], userContext?: string): RiskSignals {
   const now = new Date()
 
-  const merged = events.filter(e => e.type === 'pr_merged')
-  const openPrs = events.filter(e => e.type === 'pr_opened')
-  const openedIssues = events.filter(e => e.type === 'issue_opened')
-  const closedIssues = events.filter(e => e.type === 'issue_closed')
-  const commits = events.filter(e => e.type === 'commit')
+  const completed = events.filter(e => e.type === 'completed')
+  const inProgress = events.filter(e => e.type === 'in_progress')
+  const created = events.filter(e => e.type === 'created')
+  const updated = events.filter(e => e.type === 'updated')
+  const blocked = events.filter(e => e.type === 'blocked')
 
-  const staleOpenPrCount = openPrs.filter(e => ageInDays(e, now) > STALE_DAYS).length
-  const staleOpenIssueCount = openedIssues.filter(e => ageInDays(e, now) > STALE_DAYS).length
+  const completedCount = completed.length
+  const inProgressCount = inProgress.length
+  const createdCount = created.length
+  const updatedCount = updated.length
+  const blockedCount = blocked.length
 
-  const mergedPrCount = merged.length
-  const openPrCount = openPrs.length
-  const openedIssueCount = openedIssues.length
-  const closedIssueCount = closedIssues.length
-  const commitCount = commits.length
+  const staleCount = [
+    ...inProgress.filter(e => ageInDays(e, now) > STALE_DAYS),
+    ...created.filter(e => ageInDays(e, now) > STALE_DAYS),
+  ].length
 
-  const hasReviewBottleneck = openPrCount > 0 && (
-    (mergedPrCount === 0 && openPrCount >= 2) ||
-    (mergedPrCount > 0 && openPrCount / mergedPrCount > 1.5) ||
-    staleOpenPrCount >= 2
+  const hasReviewBottleneck = inProgressCount > 0 && (
+    (completedCount === 0 && inProgressCount >= 2) ||
+    (completedCount > 0 && inProgressCount / completedCount > 1.5) ||
+    staleCount >= 2
   )
 
-  const totalOpened = openPrCount + openedIssueCount
-  const totalClosed = mergedPrCount + closedIssueCount
-  const hasLowCompletionSignal = totalOpened > 3 && totalClosed < totalOpened * 0.4
+  const totalOpened = inProgressCount + createdCount
+  const hasLowCompletionSignal = totalOpened > 3 && completedCount < totalOpened * 0.4
 
-  const hasHighWorkInProgress = (openPrCount + openedIssueCount) > 4
+  const hasHighWorkInProgress = (inProgressCount + createdCount) > 4
 
   // Scope expansion: new work language AND more opened than closed
-  const allTitles = [...openedIssues, ...openPrs].map(e => e.title.toLowerCase())
+  const openTitles = [...created, ...inProgress].map(e => e.title.toLowerCase())
   const scopeKeywords = ['add', 'new', 'introduce', 'implement', 'feature', 'request']
-  const hasPotentialScopeExpansion = (openedIssueCount + openPrCount) > mergedPrCount + closedIssueCount
-    && allTitles.some(t => scopeKeywords.some(kw => t.includes(kw)))
+  const hasPotentialScopeExpansion = (createdCount + inProgressCount) > completedCount
+    && openTitles.some(t => scopeKeywords.some(kw => t.includes(kw)))
 
   // Fragmented execution: few repeated words across event titles
   const wordFreq = new Map<string, number>()
-  for (const e of [...openedIssues, ...openPrs, ...merged]) {
+  for (const e of [...created, ...inProgress, ...completed]) {
     for (const w of significantWords(e.title)) {
       wordFreq.set(w, (wordFreq.get(w) ?? 0) + 1)
     }
@@ -81,10 +81,13 @@ export function analyzeRisks(events: GithubEvent[], userContext?: string): RiskS
     contextLower.includes('deadline') ||
     contextLower.includes('friday') ||
     contextLower.includes('launch')
-  ) && (openPrCount + openedIssueCount) > 0
+  ) && (inProgressCount + createdCount) > 0
 
   const inferredRisks: string[] = []
 
+  if (blockedCount > 0) {
+    inferredRisks.push(`${blockedCount} item${blockedCount > 1 ? 's are' : ' is'} explicitly blocked, which may impact delivery.`)
+  }
   if (hasReviewBottleneck) {
     inferredRisks.push('Work appears to be accumulating in review, which may slow near-term delivery.')
   }
@@ -101,19 +104,18 @@ export function analyzeRisks(events: GithubEvent[], userContext?: string): RiskS
     inferredRisks.push('Delivery remains active near a known milestone, which may compress validation or review time.')
   }
 
-  const allEventText = events.map(e => `${e.title} ${e.body ?? ''}`).join(' ').toLowerCase()
+  const allEventText = events.map(e => `${e.title} ${e.description ?? ''}`).join(' ').toLowerCase()
   if (RISK_KEYWORDS.some(kw => allEventText.includes(kw))) {
     inferredRisks.push('Some activity references potential blockers, dependencies, or coordination needs.')
   }
 
   return {
-    mergedPrCount,
-    openPrCount,
-    openedIssueCount,
-    closedIssueCount,
-    commitCount,
-    staleOpenPrCount,
-    staleOpenIssueCount,
+    completedCount,
+    inProgressCount,
+    createdCount,
+    updatedCount,
+    blockedCount,
+    staleCount,
     hasHighWorkInProgress,
     hasReviewBottleneck,
     hasLowCompletionSignal,

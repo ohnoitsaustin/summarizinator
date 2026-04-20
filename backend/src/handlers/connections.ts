@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 import { getSourceConnection, listSourceConnections, upsertSourceConnection, deleteSourceConnection } from '../lib/dynamo'
+import { jiraExchangeCode } from '../lib/adapters/jira'
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!
@@ -37,8 +38,11 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
         source: c.source,
         connectedAt: c.connectedAt,
         githubLogin: c.githubLogin,
+        jiraDomain: c.jiraDomain,
       })))
     }
+
+    // ── GitHub ───────────────────────────────────────────────────────────────
 
     if (route === 'GET /api/connections/github') {
       const conn = await getSourceConnection(userId, 'github')
@@ -79,6 +83,39 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
 
     if (route === 'DELETE /api/connections/github') {
       await deleteSourceConnection(userId, 'github')
+      return ok({ disconnected: true })
+    }
+
+    // ── Jira ─────────────────────────────────────────────────────────────────
+
+    if (route === 'GET /api/connections/jira') {
+      const conn = await getSourceConnection(userId, 'jira')
+      if (!conn) return err(404, 'Jira not connected')
+      return ok({ source: 'jira', connectedAt: conn.connectedAt, jiraDomain: conn.jiraDomain })
+    }
+
+    if (route === 'POST /api/connections/jira') {
+      const body = JSON.parse(event.body ?? '{}') as { code?: string; redirectUri?: string }
+      if (!body.code || !body.redirectUri) return err(400, 'Missing code or redirectUri')
+
+      const data = await jiraExchangeCode(body.code, body.redirectUri)
+
+      await upsertSourceConnection({
+        userId,
+        source: 'jira',
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        expiresAt: data.expiresAt,
+        jiraCloudId: data.cloudId,
+        jiraDomain: data.domain,
+        connectedAt: new Date().toISOString(),
+      })
+
+      return ok({ source: 'jira', connected: true, jiraDomain: data.domain })
+    }
+
+    if (route === 'DELETE /api/connections/jira') {
+      await deleteSourceConnection(userId, 'jira')
       return ok({ disconnected: true })
     }
 

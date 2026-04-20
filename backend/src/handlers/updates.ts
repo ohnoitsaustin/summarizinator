@@ -1,15 +1,15 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 import { getProject, getSourceConnection, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
-import type { GithubEvent, AudienceMode } from '../types'
-import { fetchRepoEvents } from '../lib/github'
+import type { Event, AudienceMode } from '../types'
+import { fetchEvents } from '../lib/adapters'
 import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
 import { analyzeRisks } from '../lib/riskAnalysis'
 
-function parseRawEvents(raw: string): GithubEvent[] {
+function parseRawEvents(raw: string): Event[] {
   try {
-    return (JSON.parse(raw) as GithubEvent[]).map(e => ({ ...e, id: e.id ?? e.url }))
+    return JSON.parse(raw) as Event[]
   } catch {
     return []
   }
@@ -40,6 +40,10 @@ function parseAudience(value: unknown): AudienceMode {
   return 'engineering'
 }
 
+async function getConnection(userId: string, source: 'github' | 'jira') {
+  return getSourceConnection(userId, source)
+}
+
 async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
   const body = JSON.parse(event.body ?? '{}') as {
     projectId?: string
@@ -51,18 +55,20 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   }
   if (!body.projectId) return err(400, 'Missing projectId')
 
-  const [project, connection] = await Promise.all([
-    getProject(userId, body.projectId),
-    getSourceConnection(userId, 'github'),
-  ])
+  const project = await getProject(userId, body.projectId)
   if (!project) return err(404, 'Project not found')
-  if (!connection) return err(400, 'GitHub not connected. Connect your GitHub account first.')
+
+  const connection = await getConnection(userId, project.source)
+  if (!connection) {
+    const label = project.source === 'github' ? 'GitHub' : 'Jira'
+    return err(400, `${label} not connected. Connect your ${label} account first.`)
+  }
 
   const days = body.days ?? 7
   const audience = parseAudience(body.audience)
   const context = body.context?.trim() || undefined
 
-  const rawEvents = await fetchRepoEvents(connection.accessToken, project.repoOwner, project.repoName, days)
+  const rawEvents = await fetchEvents(project, connection, days)
   const hiddenSet = new Set(body.hiddenIds ?? [])
   const highlightedSet = new Set(body.highlightedIds ?? [])
   const events = preprocessEvents(rawEvents)
@@ -161,14 +167,16 @@ async function handleFetchEvents(event: APIGatewayProxyEventV2, userId: string):
   const days = parseInt(event.queryStringParameters?.days ?? '7', 10)
   if (!projectId) return err(400, 'Missing projectId')
 
-  const [project, connection] = await Promise.all([
-    getProject(userId, projectId),
-    getSourceConnection(userId, 'github'),
-  ])
+  const project = await getProject(userId, projectId)
   if (!project) return err(404, 'Project not found')
-  if (!connection) return err(400, 'GitHub not connected. Connect your GitHub account first.')
 
-  const rawEvents = await fetchRepoEvents(connection.accessToken, project.repoOwner, project.repoName, days)
+  const connection = await getConnection(userId, project.source)
+  if (!connection) {
+    const label = project.source === 'github' ? 'GitHub' : 'Jira'
+    return err(400, `${label} not connected. Connect your ${label} account first.`)
+  }
+
+  const rawEvents = await fetchEvents(project, connection, days)
   const events = preprocessEvents(rawEvents)
   return ok({ events, days })
 }

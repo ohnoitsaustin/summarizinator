@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, type Project, type UpdateSummary, type GithubEvent, type AudienceMode } from '../api/client'
+import { api, type Project, type UpdateSummary, type AudienceMode } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
@@ -25,8 +25,8 @@ export default function ProjectPage() {
   const [project, setProject] = useState<Project | null>(null)
   const [updates, setUpdates] = useState<UpdateSummary[]>([])
   const [activeContent, setActiveContent] = useState('')
-  const [activeEvents, setActiveEvents] = useState<GithubEvent[]>([])
-  const [allEvents, setAllEvents] = useState<GithubEvent[]>([])
+  const [activeEvents, setActiveEvents] = useState<UpdateSummary['events']>([])
+  const [allEvents, setAllEvents] = useState<UpdateSummary['events']>([])
   const [fetchedDays, setFetchedDays] = useState(0)
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set())
   const [highlightedIds, setHighlightedIds] = useState<Set<string>>(new Set())
@@ -46,7 +46,7 @@ export default function ProjectPage() {
   const [saveName, setSaveName] = useState('')
   const [saving, setSaving] = useState(false)
   const [editingProject, setEditingProject] = useState(false)
-  const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '' })
+  const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '', jiraProjectKey: '' })
   const [savingProject, setSavingProject] = useState(false)
 
   const since = useMemo(() => {
@@ -206,7 +206,7 @@ export default function ProjectPage() {
     setShowSave(false)
     try {
       const effectiveHighlightedIds = events
-        .filter(e => highlightedIds.has(e.id) || highlightedAuthors.has(e.author))
+        .filter(e => highlightedIds.has(e.id) || (e.actor != null && highlightedAuthors.has(e.actor)))
         .map(e => e.id)
       const result = await api.updates.generate(id, effectiveDays, audience, context.trim() || undefined, [...hiddenIds], effectiveHighlightedIds)
       setActiveContent(result.content)
@@ -270,7 +270,10 @@ export default function ProjectPage() {
     if (!project) return
     setSavingProject(true)
     try {
-      const updated = await api.projects.patch(project.id, editForm)
+      const sourceConfig = project.source === 'jira'
+        ? { jiraProjectKey: editForm.jiraProjectKey, jiraCloudId: project.sourceConfig.jiraCloudId }
+        : { repoOwner: editForm.repoOwner, repoName: editForm.repoName }
+      const updated = await api.projects.patch(project.id, { name: editForm.name, sourceConfig })
       setProject(updated)
       setEditingProject(false)
     } catch {
@@ -308,23 +311,33 @@ export default function ProjectPage() {
                 placeholder="Project name"
                 className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-xl font-semibold focus:outline-none w-64 transition-colors block"
               />
-              <div className="flex items-center gap-1">
+              {project.source === 'github' ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    required
+                    value={editForm.repoOwner}
+                    onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
+                    placeholder="owner"
+                    className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                  />
+                  <span className="text-brand-accent/40 text-sm">/</span>
+                  <input
+                    required
+                    value={editForm.repoName}
+                    onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
+                    placeholder="repo"
+                    className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                  />
+                </div>
+              ) : (
                 <input
                   required
-                  value={editForm.repoOwner}
-                  onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
-                  placeholder="owner"
-                  className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
+                  value={editForm.jiraProjectKey}
+                  onChange={e => setEditForm(f => ({ ...f, jiraProjectKey: e.target.value.toUpperCase() }))}
+                  placeholder="Jira project key"
+                  className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-40 text-brand-accent/60 transition-colors"
                 />
-                <span className="text-brand-accent/40 text-sm">/</span>
-                <input
-                  required
-                  value={editForm.repoName}
-                  onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
-                  placeholder="repo"
-                  className="bg-transparent border-b border-brand-light/50 focus:border-brand-accent text-sm focus:outline-none w-28 text-brand-accent/60 transition-colors"
-                />
-              </div>
+              )}
               <div className="flex gap-2 pt-1">
                 <button type="submit" disabled={savingProject} className="px-2.5 py-1 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded text-xs text-brand-bg font-medium transition-colors">
                   {savingProject ? 'Saving…' : 'Save'}
@@ -338,10 +351,24 @@ export default function ProjectPage() {
             <div className="flex items-start gap-3 group">
               <div>
                 <h2 className="text-xl font-semibold">{project.name}</h2>
-                <a href={`https://github.com/${project.repoOwner}/${project.repoName}`} target="_blank" rel="noreferrer" className="text-brand-accent/60 hover:text-brand-accent text-sm transition-colors">{project.repoOwner}/{project.repoName}</a>
+                {project.source === 'github' && project.sourceConfig.repoOwner && project.sourceConfig.repoName ? (
+                  <a href={`https://github.com/${project.sourceConfig.repoOwner}/${project.sourceConfig.repoName}`} target="_blank" rel="noreferrer" className="text-brand-accent/60 hover:text-brand-accent text-sm transition-colors">
+                    {project.sourceConfig.repoOwner}/{project.sourceConfig.repoName}
+                  </a>
+                ) : project.source === 'jira' && project.sourceConfig.jiraProjectKey ? (
+                  <span className="text-brand-accent/60 text-sm">{project.sourceConfig.jiraProjectKey} · Jira</span>
+                ) : null}
               </div>
               <button
-                onClick={() => { setEditForm({ name: project.name, repoOwner: project.repoOwner, repoName: project.repoName }); setEditingProject(true) }}
+                onClick={() => {
+                  setEditForm({
+                    name: project.name,
+                    repoOwner: project.sourceConfig.repoOwner ?? '',
+                    repoName: project.sourceConfig.repoName ?? '',
+                    jiraProjectKey: project.sourceConfig.jiraProjectKey ?? '',
+                  })
+                  setEditingProject(true)
+                }}
                 className="mt-1 text-brand-light/30 hover:text-brand-light opacity-0 group-hover:opacity-100 transition-all text-sm"
                 title="Edit project"
               >
@@ -404,7 +431,7 @@ export default function ProjectPage() {
               <GenerateButton
                 onClick={handleGenerate}
                 loading={generating}
-                allHidden={events.length > 0 && events.every(e => hiddenIds.has(e.id) || hiddenAuthors.has(e.author))}
+                allHidden={events.length > 0 && events.every(e => hiddenIds.has(e.id) || (e.actor != null && hiddenAuthors.has(e.actor)))}
               />
               <div className="flex rounded overflow-hidden border border-brand-light/50 text-xs">
                 {SPAN_OPTIONS.map(({ d, label }, i) => (

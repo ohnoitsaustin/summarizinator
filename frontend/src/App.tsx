@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
 import ConnectGitHub from './pages/ConnectGitHub'
+import ConnectJira from './pages/ConnectJira'
 import Dashboard from './pages/Dashboard'
 import ProjectPage from './pages/ProjectPage'
 
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/connect/github/callback" element={<ConnectGitHub />} />
+          <Route path="/connect/jira/callback" element={<ConnectJira />} />
           <Route
             path="/dashboard"
             element={

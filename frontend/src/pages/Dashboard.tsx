@@ -23,18 +23,33 @@ function saveOrder(projects: Project[]) {
   localStorage.setItem(ORDER_KEY, JSON.stringify(projects.map(p => p.id)))
 }
 
+type CreateForm = {
+  name: string
+  source: 'github' | 'jira'
+  repoOwner: string
+  repoName: string
+  jiraProjectKey: string
+}
+
+type EditForm = {
+  name: string
+  repoOwner: string
+  repoName: string
+  jiraProjectKey: string
+}
+
 export default function Dashboard() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ name: '', repoOwner: '', repoName: '' })
+  const [form, setForm] = useState<CreateForm>({ name: '', source: 'github', repoOwner: '', repoName: '', jiraProjectKey: '' })
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', repoOwner: '', repoName: '' })
+  const [editForm, setEditForm] = useState<EditForm>({ name: '', repoOwner: '', repoName: '', jiraProjectKey: '' })
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -49,14 +64,17 @@ export default function Dashboard() {
     setCreating(true)
     setError(null)
     try {
-      const project = await api.projects.create(form)
+      const sourceConfig = form.source === 'jira'
+        ? { jiraProjectKey: form.jiraProjectKey }
+        : { repoOwner: form.repoOwner, repoName: form.repoName }
+      const project = await api.projects.create({ name: form.name, source: form.source, sourceConfig })
       setProjects(p => {
         const next = [project, ...p]
         saveOrder(next)
         return next
       })
       setShowForm(false)
-      setForm({ name: '', repoOwner: '', repoName: '' })
+      setForm({ name: '', source: 'github', repoOwner: '', repoName: '', jiraProjectKey: '' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create project')
     } finally {
@@ -66,15 +84,23 @@ export default function Dashboard() {
 
   function startEdit(p: Project) {
     setEditingId(p.id)
-    setEditForm({ name: p.name, repoOwner: p.repoOwner, repoName: p.repoName })
+    setEditForm({
+      name: p.name,
+      repoOwner: p.sourceConfig.repoOwner ?? '',
+      repoName: p.sourceConfig.repoName ?? '',
+      jiraProjectKey: p.sourceConfig.jiraProjectKey ?? '',
+    })
   }
 
-  async function handleSaveEdit(e: React.FormEvent) {
+  async function handleSaveEdit(e: React.FormEvent, project: Project) {
     e.preventDefault()
     if (!editingId) return
     setSaving(true)
     try {
-      const updated = await api.projects.patch(editingId, editForm)
+      const sourceConfig = project.source === 'jira'
+        ? { jiraProjectKey: editForm.jiraProjectKey, jiraCloudId: project.sourceConfig.jiraCloudId }
+        : { repoOwner: editForm.repoOwner, repoName: editForm.repoName }
+      const updated = await api.projects.patch(editingId, { name: editForm.name, sourceConfig })
       setProjects(prev => prev.map(p => p.id === editingId ? updated : p))
       setEditingId(null)
     } catch {
@@ -144,31 +170,54 @@ export default function Dashboard() {
               onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
               className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
             />
-            <div className="flex gap-2">
-              <input
-                required
-                placeholder="Owner (e.g. acme)"
-                value={form.repoOwner}
-                onChange={e => setForm(f => ({ ...f, repoOwner: e.target.value }))}
-                onPaste={e => {
-                  const text = e.clipboardData.getData('text')
-                  if (!text.includes('/')) return
-                  e.preventDefault()
-                  const slash = text.indexOf('/')
-                  const owner = text.slice(0, slash).trim()
-                  const repo = text.slice(slash + 1).trim()
-                  setForm(f => ({ ...f, repoOwner: owner, repoName: repo, name: f.name || repo }))
-                }}
-                className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
-              />
-              <input
-                required
-                placeholder="Repo (e.g. api)"
-                value={form.repoName}
-                onChange={e => setForm(f => ({ ...f, repoName: e.target.value, name: f.name || e.target.value }))}
-                className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
-              />
+            {/* Source selector */}
+            <div className="flex rounded-lg overflow-hidden border border-brand-light/30 text-sm">
+              {(['github', 'jira'] as const).map((src, i) => (
+                <button
+                  key={src}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, source: src }))}
+                  className={`flex-1 py-2 transition-colors capitalize ${form.source === src ? 'bg-brand-cta text-brand-bg font-medium' : 'text-brand-accent/70 hover:text-white'} ${i > 0 ? 'border-l border-brand-light/30' : ''}`}
+                >
+                  {src === 'github' ? 'GitHub' : 'Jira'}
+                </button>
+              ))}
             </div>
+            {form.source === 'github' ? (
+              <div className="flex gap-2">
+                <input
+                  required
+                  placeholder="Owner (e.g. acme)"
+                  value={form.repoOwner}
+                  onChange={e => setForm(f => ({ ...f, repoOwner: e.target.value }))}
+                  onPaste={e => {
+                    const text = e.clipboardData.getData('text')
+                    if (!text.includes('/')) return
+                    e.preventDefault()
+                    const slash = text.indexOf('/')
+                    const owner = text.slice(0, slash).trim()
+                    const repo = text.slice(slash + 1).trim()
+                    setForm(f => ({ ...f, repoOwner: owner, repoName: repo, name: f.name || repo }))
+                  }}
+                  className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                />
+                <input
+                  required
+                  placeholder="Repo (e.g. api)"
+                  value={form.repoName}
+                  onChange={e => setForm(f => ({ ...f, repoName: e.target.value, name: f.name || e.target.value }))}
+                  className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                />
+              </div>
+            ) : (
+              <input
+                required
+                placeholder="Jira project key (e.g. ENG)"
+                value={form.jiraProjectKey}
+                onChange={e => setForm(f => ({ ...f, jiraProjectKey: e.target.value.toUpperCase(), name: f.name || e.target.value }))}
+                className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+              />
+            )}
           </div>
           <div className="flex gap-2">
             <button
@@ -199,7 +248,7 @@ export default function Dashboard() {
             <div key={p.id}>
               <div className={`h-0.5 rounded-full my-1.5 transition-colors ${dropIndex === i && draggedId !== p.id ? 'bg-brand-accent' : 'bg-transparent'}`} />
               {editingId === p.id ? (
-                <form onSubmit={handleSaveEdit} className="bg-brand-surface border border-brand-light/50 rounded-xl px-6 py-4 space-y-3">
+                <form onSubmit={e => handleSaveEdit(e, p)} className="bg-brand-surface border border-brand-light/50 rounded-xl px-6 py-4 space-y-3">
                   <input
                     required autoFocus
                     value={editForm.name}
@@ -207,22 +256,32 @@ export default function Dashboard() {
                     placeholder="Project name"
                     className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                   />
-                  <div className="flex gap-2">
+                  {p.source === 'github' ? (
+                    <div className="flex gap-2">
+                      <input
+                        required
+                        value={editForm.repoOwner}
+                        onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
+                        placeholder="Owner"
+                        className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                      />
+                      <input
+                        required
+                        value={editForm.repoName}
+                        onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
+                        placeholder="Repo"
+                        className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                      />
+                    </div>
+                  ) : (
                     <input
                       required
-                      value={editForm.repoOwner}
-                      onChange={e => setEditForm(f => ({ ...f, repoOwner: e.target.value }))}
-                      placeholder="Owner"
-                      className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                      value={editForm.jiraProjectKey}
+                      onChange={e => setEditForm(f => ({ ...f, jiraProjectKey: e.target.value.toUpperCase() }))}
+                      placeholder="Jira project key"
+                      className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                     />
-                    <input
-                      required
-                      value={editForm.repoName}
-                      onChange={e => setEditForm(f => ({ ...f, repoName: e.target.value }))}
-                      placeholder="Repo"
-                      className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
-                    />
-                  </div>
+                  )}
                   <div className="flex gap-2">
                     <button type="submit" disabled={saving} className="px-3 py-1.5 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded-lg text-xs text-brand-bg font-medium transition-colors">
                       {saving ? 'Saving…' : 'Save'}

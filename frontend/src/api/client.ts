@@ -29,37 +29,47 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 export type Project = {
   id: string
   name: string
-  repoOwner: string
-  repoName: string
+  source: 'github' | 'jira'
+  sourceConfig: {
+    repoOwner?: string
+    repoName?: string
+    jiraProjectKey?: string
+    jiraCloudId?: string
+  }
   createdAt: string
 }
 
 export type AudienceMode = 'engineering' | 'product' | 'executive'
+
+export type Event = {
+  id: string
+  source: 'github' | 'jira'
+  type: 'completed' | 'created' | 'in_progress' | 'updated' | 'blocked'
+  title: string
+  description?: string
+  actor?: string
+  assignee?: string
+  createdAt: string
+  updatedAt?: string
+  status?: string
+  labels?: string[]
+  url?: string
+  highlighted?: boolean
+}
 
 export type UpdateSummary = {
   id: string
   name: string
   content: string
   createdAt: string
-  events: GithubEvent[]
+  events: Event[]
   audience: AudienceMode
   generationContext?: string
 }
 
-export type GithubEvent = {
-  id: string
-  type: 'release' | 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
-  title: string
-  body?: string
-  author: string
-  createdAt: string
-  url: string
-  highlighted?: boolean
-}
-
 type GenerateResult = {
   content: string
-  events: GithubEvent[]
+  events: Event[]
   audience: AudienceMode
   generationContext?: string
 }
@@ -68,6 +78,7 @@ type Connection = {
   source: string
   connectedAt: string
   githubLogin?: string
+  jiraDomain?: string
 }
 
 export const api = {
@@ -81,12 +92,20 @@ export const api = {
       ),
     disconnectGitHub: () =>
       request<{ disconnected: boolean }>('/api/connections/github', { method: 'DELETE' }),
+    getJira: () => request<Connection>('/api/connections/jira'),
+    connectJira: (code: string, redirectUri: string) =>
+      request<{ source: string; connected: boolean; jiraDomain: string }>(
+        '/api/connections/jira',
+        { method: 'POST', body: JSON.stringify({ code, redirectUri }) },
+      ),
+    disconnectJira: () =>
+      request<{ disconnected: boolean }>('/api/connections/jira', { method: 'DELETE' }),
   },
   projects: {
     list: () => request<Project[]>('/api/projects'),
-    create: (data: { name: string; repoOwner: string; repoName: string }) =>
+    create: (data: { name: string; source: 'github' | 'jira'; sourceConfig: Project['sourceConfig'] }) =>
       request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
-    patch: (id: string, data: { name: string; repoOwner: string; repoName: string }) =>
+    patch: (id: string, data: { name: string; sourceConfig?: Project['sourceConfig'] }) =>
       request<Project>(`/api/projects/${id}`, { method: 'PATCH', body: JSON.stringify(data) }),
   },
   updates: {
@@ -95,7 +114,7 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ projectId, days, audience, context, hiddenIds, highlightedIds }),
       }),
-    save: (projectId: string, name: string, content: string, rawEvents: GithubEvent[], audience: AudienceMode, context?: string) =>
+    save: (projectId: string, name: string, content: string, rawEvents: Event[], audience: AudienceMode, context?: string) =>
       request<UpdateSummary>('/api/updates/save', {
         method: 'POST',
         body: JSON.stringify({ projectId, name, content, rawEvents: JSON.stringify(rawEvents), audience, context }),
@@ -103,7 +122,7 @@ export const api = {
     list: (projectId: string) =>
       request<UpdateSummary[]>(`/api/projects/${projectId}/updates`),
     fetchEvents: (projectId: string, days: number) =>
-      request<{ events: GithubEvent[]; days: number }>(`/api/projects/${projectId}/events?days=${days}`),
+      request<{ events: Event[]; days: number }>(`/api/projects/${projectId}/events?days=${days}`),
     delete: (updateId: string, projectId: string) =>
       request<{ deleted: boolean }>(`/api/updates/${updateId}`, {
         method: 'DELETE',

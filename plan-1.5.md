@@ -188,7 +188,7 @@ Note: `google-client-secret` is stored as SSM String (not SecureString) because 
 
 ---
 
-## Step 1: Refactor GitHub → Event Mapping
+## Step 1: Refactor GitHub → Event Mapping ✅ DONE
 
 ### Goal
 
@@ -211,7 +211,7 @@ Move current GitHub logic into a proper adapter.
 
 ---
 
-## Step 2: Jira Integration
+## Step 2: Jira Integration ✅ DONE
 
 ### Auth
 
@@ -224,7 +224,7 @@ Minimum scopes:
 
 ---
 
-## Step 3: Fetch Jira Data
+## Step 3: Fetch Jira Data ✅ DONE
 
 ### Endpoint
 
@@ -244,7 +244,7 @@ Where N = selected time window
 
 ---
 
-## Step 4: Jira → Event Mapping
+## Step 4: Jira → Event Mapping ✅ DONE
 
 ### Core Mapping
 
@@ -462,19 +462,30 @@ Jira-based output should feel:
 * Frontend migrated to Amplify v6; Login page supports email/password + Google
 * Old AuthFn Lambda and custom JWT library deleted
 
-### Day 1
+### Day 1 ✅
 
-* Event model defined
-* GitHub adapter refactored (reads token from SourceConnection)
+* Unified `Event` type defined in `types.ts`
+* `Project` updated with `source` + `sourceConfig`; backward-compat normalizer for legacy DynamoDB records
+* GitHub adapter (`adapters/github.ts`) maps `GithubEvent` → `Event` (commit → updated, pr_merged/release/issue_closed → completed, pr_opened → in_progress, issue_opened → created)
+* `preprocessing.ts` updated to use `Event`, prefers `completed` in dedup
+* `riskAnalysis.ts` refactored — generic field names (`completedCount`, `inProgressCount`, etc.), works for any source
+* `bedrock.ts` updated to use `Event[]`, prompt uses generic signal names
+* `dynamo.ts` + `projects.ts` handler updated for new Project schema
 
-### Day 2
+### Day 2 ✅
 
-* Jira auth + fetch working (stores token in SourceConnection)
+* Jira OAuth 3LO implemented (`adapters/jira.ts`): code exchange, accessible-resources for cloudId, token refresh
+* `connections.ts` handler extended with `GET/POST/DELETE /api/connections/jira`
+* Jira SSM params added to CDK stack; routes wired in API Gateway
+* `ConnectJira.tsx` page + `initiateJiraConnect()` helper added to frontend
+* `VITE_JIRA_CLIENT_ID` env var added
 
-### Day 3
+### Day 3 ✅
 
-* Jira → Event mapping complete
-* Pipeline unified
+* Jira → Event mapping complete (`jiraFetchEvents` in `adapters/jira.ts`)
+* Adapter dispatcher (`adapters/index.ts`) routes by `project.source`; handles Jira token refresh
+* Pipeline unified: `updates.ts` calls `fetchEvents(project, connection, days)` — no source branching downstream
+* `cloudId` resolved from SourceConnection at project creation time
 
 ### Day 4
 

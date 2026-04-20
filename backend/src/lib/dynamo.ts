@@ -5,6 +5,19 @@ import type { SourceConnection, Project, Update } from '../types'
 const TABLE = process.env.DYNAMODB_TABLE_NAME!
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}))
 
+// Normalize legacy DynamoDB records that have top-level repoOwner/repoName
+function normalizeProject(item: Record<string, unknown>): Project {
+  if (item.source) return item as Project
+  return {
+    ...(item as object),
+    source: 'github',
+    sourceConfig: {
+      repoOwner: item.repoOwner as string | undefined,
+      repoName: item.repoName as string | undefined,
+    },
+  } as Project
+}
+
 export async function getSourceConnection(userId: string, source: SourceConnection['source']): Promise<SourceConnection | null> {
   const res = await client.send(new GetCommand({
     TableName: TABLE,
@@ -46,7 +59,7 @@ export async function getProjectsByUser(userId: string): Promise<Project[]> {
     KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
     ExpressionAttributeValues: { ':pk': `USER#${userId}`, ':sk': 'PROJECT#' },
   }))
-  return (res.Items ?? []) as Project[]
+  return (res.Items ?? []).map(item => normalizeProject(item as Record<string, unknown>))
 }
 
 export async function getProject(userId: string, projectId: string): Promise<Project | null> {
@@ -54,7 +67,7 @@ export async function getProject(userId: string, projectId: string): Promise<Pro
     TableName: TABLE,
     Key: { PK: `USER#${userId}`, SK: `PROJECT#${projectId}` },
   }))
-  return res.Item ? (res.Item as Project) : null
+  return res.Item ? normalizeProject(res.Item as Record<string, unknown>) : null
 }
 
 export async function createProject(project: Project): Promise<void> {
@@ -113,13 +126,17 @@ export async function patchUpdateContent(projectId: string, updateId: string, co
   }))
 }
 
-export async function patchProject(userId: string, projectId: string, fields: { name: string; repoOwner: string; repoName: string }): Promise<void> {
+export async function patchProject(
+  userId: string,
+  projectId: string,
+  fields: { name: string; sourceConfig: Project['sourceConfig'] },
+): Promise<void> {
   await client.send(new UpdateCommand({
     TableName: TABLE,
     Key: { PK: `USER#${userId}`, SK: `PROJECT#${projectId}` },
-    UpdateExpression: 'SET #name = :name, repoOwner = :repoOwner, repoName = :repoName',
+    UpdateExpression: 'SET #name = :name, sourceConfig = :sourceConfig',
     ExpressionAttributeNames: { '#name': 'name' },
-    ExpressionAttributeValues: { ':name': fields.name, ':repoOwner': fields.repoOwner, ':repoName': fields.repoName },
+    ExpressionAttributeValues: { ':name': fields.name, ':sourceConfig': fields.sourceConfig },
   }))
 }
 

@@ -1,27 +1,32 @@
 import React, { useRef, useEffect, useLayoutEffect, useState } from 'react'
-import type { GithubEvent } from '../api/client'
+import type { Event } from '../api/client'
 
-const TYPE_PRIORITY: Record<GithubEvent['type'], number> = {
-  release: 0,
-  pr_merged: 1,
-  issue_closed: 2,
-  pr_opened: 3,
-  commit: 4,
-  issue_opened: 5,
+const TYPE_PRIORITY: Record<Event['type'], number> = {
+  completed:   0,
+  in_progress: 1,
+  blocked:     2,
+  created:     3,
+  updated:     4,
+}
+
+function eventActor(e: Event): string {
+  return e.actor ?? e.assignee ?? '?'
 }
 
 function sortEvents(
-  evts: GithubEvent[],
+  evts: Event[],
   hiddenIds: Set<string>,
   highlightedIds: Set<string>,
   hiddenAuthors: Set<string>,
   highlightedAuthors: Set<string>,
-): GithubEvent[] {
+): Event[] {
   return [...evts].sort((a, b) => {
-    const aHidden = hiddenIds.has(a.id) || hiddenAuthors.has(a.author)
-    const bHidden = hiddenIds.has(b.id) || hiddenAuthors.has(b.author)
-    const aHL = highlightedIds.has(a.id) || highlightedAuthors.has(a.author)
-    const bHL = highlightedIds.has(b.id) || highlightedAuthors.has(b.author)
+    const aActor = eventActor(a)
+    const bActor = eventActor(b)
+    const aHidden = hiddenIds.has(a.id) || hiddenAuthors.has(aActor)
+    const bHidden = hiddenIds.has(b.id) || hiddenAuthors.has(bActor)
+    const aHL = highlightedIds.has(a.id) || highlightedAuthors.has(aActor)
+    const bHL = highlightedIds.has(b.id) || highlightedAuthors.has(bActor)
     if (aHL !== bHL) return Number(bHL) - Number(aHL)
     if (aHidden !== bHidden) return Number(aHidden) - Number(bHidden)
     const typeDiff = TYPE_PRIORITY[a.type] - TYPE_PRIORITY[b.type]
@@ -30,26 +35,23 @@ function sortEvents(
   })
 }
 
-const TYPE_ORDER: GithubEvent['type'][] = ['release', 'pr_merged', 'issue_closed', 'pr_opened', 'commit', 'issue_opened']
+const TYPE_ORDER: Event['type'][] = ['completed', 'in_progress', 'blocked', 'created', 'updated']
 const DEFAULT_PER_TYPE = 3
 
-const TYPE_LABELS: Record<GithubEvent['type'], string> = {
-  release: 'Release',
-  pr_merged: 'PR Merged',
-  pr_opened: 'PR Opened',
-  issue_closed: 'Issue Closed',
-  issue_opened: 'Issue Opened',
-  commit: 'Commit',
+const TYPE_LABELS: Record<Event['type'], string> = {
+  completed:   'Completed',
+  in_progress: 'In Progress',
+  blocked:     'Blocked',
+  created:     'Created',
+  updated:     'Updated',
 }
 
-
-const TYPE_COLORS: Record<GithubEvent['type'], string> = {
-  release: 'bg-purple-900/60 text-purple-300',
-  pr_merged: 'bg-emerald-900/60 text-emerald-300',
-  pr_opened: 'bg-blue-900/60 text-blue-300',
-  issue_closed: 'bg-brand-light/60 text-brand-accent',
-  issue_opened: 'bg-yellow-900/60 text-yellow-300',
-  commit: 'bg-brand-surface text-brand-accent/70',
+const TYPE_COLORS: Record<Event['type'], string> = {
+  completed:   'bg-emerald-900/60 text-emerald-300',
+  in_progress: 'bg-blue-900/60 text-blue-300',
+  blocked:     'bg-red-900/60 text-red-300',
+  created:     'bg-yellow-900/60 text-yellow-300',
+  updated:     'bg-brand-surface text-brand-accent/70',
 }
 
 type DragState = {
@@ -92,7 +94,7 @@ function AuthorChip({ author, count, hiddenAuthors, highlightedAuthors, onToggle
 }
 
 function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlightedAuthors, itemRefs, startDrag, enterDrag }: {
-  event: GithubEvent
+  event: Event
   hiddenIds: Set<string>
   highlightedIds: Set<string>
   hiddenAuthors: Set<string>
@@ -101,8 +103,9 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
   startDrag: (id: string, action: 'hide' | 'highlight', e: React.MouseEvent) => void
   enterDrag: (id: string, action: 'hide' | 'highlight') => void
 }) {
-  const authorHidden = hiddenAuthors.has(event.author)
-  const authorHighlighted = highlightedAuthors.has(event.author)
+  const actor = eventActor(event)
+  const authorHidden = hiddenAuthors.has(actor)
+  const authorHighlighted = highlightedAuthors.has(actor)
   const hidden = hiddenIds.has(event.id) || authorHidden
   const highlighted = highlightedIds.has(event.id) || authorHighlighted
   const superHighlighted = highlightedIds.has(event.id) && authorHighlighted
@@ -117,13 +120,21 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
       }`}
     >
       <div className="flex items-center gap-2">
-        <a href={event.url} target="_blank" rel="noreferrer"
-          className={`flex-1 text-sm truncate transition-colors hover:text-white ${
+        {event.url ? (
+          <a href={event.url} target="_blank" rel="noreferrer"
+            className={`flex-1 text-sm truncate transition-colors hover:text-white ${
+              superHighlighted ? 'text-white font-semibold' : highlighted ? 'text-brand-accent' : 'text-brand-accent/80'
+            }`}
+          >
+            {event.title}
+          </a>
+        ) : (
+          <span className={`flex-1 text-sm truncate ${
             superHighlighted ? 'text-white font-semibold' : highlighted ? 'text-brand-accent' : 'text-brand-accent/80'
-          }`}
-        >
-          {event.title}
-        </a>
+          }`}>
+            {event.title}
+          </span>
+        )}
         <button
           onMouseDown={e => { if (!authorHidden && !hiddenIds.has(event.id)) startDrag(event.id, 'highlight', e) }}
           onMouseEnter={() => enterDrag(event.id, 'highlight')}
@@ -141,7 +152,10 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
       </div>
       <div className="flex items-center gap-2 mt-1">
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[event.type]}`}>{TYPE_LABELS[event.type]}</span>
-        <span className="text-xs text-brand-light">@{event.author}</span>
+        {actor !== '?' && <span className="text-xs text-brand-light">@{actor}</span>}
+        {event.assignee && event.actor && event.assignee !== event.actor && (
+          <span className="text-xs text-brand-light/50">→ {event.assignee}</span>
+        )}
         <span className="text-xs text-brand-light/60" title={new Date(event.createdAt).toLocaleString()}>
           {new Date(event.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
           {' '}
@@ -153,7 +167,7 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
 }
 
 type Props = {
-  events: GithubEvent[]
+  events: Event[]
   days: number
   hiddenIds: Set<string>
   highlightedIds: Set<string>
@@ -184,10 +198,13 @@ export default function EventList({
   const dragRef = useRef<DragState | null>(null)
   const [showOverflow, setShowOverflow] = useState(false)
   const [search, setSearch] = useState('')
-  const [expandedTypes, setExpandedTypes] = useState<Set<GithubEvent['type']>>(new Set())
+  const [expandedTypes, setExpandedTypes] = useState<Set<Event['type']>>(new Set())
 
   const authorCounts = new Map<string, number>()
-  events.forEach(e => authorCounts.set(e.author, (authorCounts.get(e.author) ?? 0) + 1))
+  events.forEach(e => {
+    const a = eventActor(e)
+    if (a !== '?') authorCounts.set(a, (authorCounts.get(a) ?? 0) + 1)
+  })
   const authors = Array.from(authorCounts.entries())
     .sort((a, b) => b[1] - a[1])
     .map(([author]) => author)
@@ -200,7 +217,7 @@ export default function EventList({
   const eventsRef = useRef(events)
   eventsRef.current = events
 
-  const [sortedEvents, setSortedEvents] = useState<GithubEvent[]>(
+  const [sortedEvents, setSortedEvents] = useState<Event[]>(
     () => sortEvents(events, new Set(), new Set(), new Set(), new Set()),
   )
 
@@ -304,14 +321,14 @@ export default function EventList({
         const term = search.trim().toLowerCase()
         const searchPool = term
           ? [...eventsRef.current]
-              .filter(e => e.title.toLowerCase().includes(term) || e.author.toLowerCase().includes(term))
+              .filter(e => e.title.toLowerCase().includes(term) || eventActor(e).toLowerCase().includes(term))
               .sort((a, b) => TYPE_PRIORITY[a.type] - TYPE_PRIORITY[b.type])
           : null
         const globalIds = (searchPool ?? eventsRef.current).map(e => e.id)
         const allHL = globalIds.length > 0 && globalIds.every((id: string) => highlightedIds.has(id))
         const allHid = globalIds.length > 0 && globalIds.every((id: string) => hiddenIds.has(id))
 
-        const grouped = new Map<GithubEvent['type'], GithubEvent[]>(TYPE_ORDER.map(t => [t, []]))
+        const grouped = new Map<Event['type'], Event[]>(TYPE_ORDER.map(t => [t, []]))
         for (const e of sortedEvents) grouped.get(e.type)?.push(e)
 
         return (

@@ -14,8 +14,13 @@ export type Project = {
   id: string
   userId: string
   name: string
-  repoOwner: string
-  repoName: string
+  source: 'github' | 'jira'
+  sourceConfig: {
+    repoOwner?: string
+    repoName?: string
+    jiraProjectKey?: string
+    jiraCloudId?: string
+  }
   createdAt: string
 }
 
@@ -32,8 +37,25 @@ export type Update = {
   generationContext?: string
 }
 
+export type Event = {
+  id: string
+  source: 'github' | 'jira'
+  type: 'completed' | 'created' | 'in_progress' | 'updated' | 'blocked'
+  title: string
+  description?: string
+  actor?: string
+  assignee?: string
+  createdAt: string
+  updatedAt?: string
+  status?: string
+  labels?: string[]
+  url?: string
+  highlighted?: boolean
+}
+
+// Internal type used only by the GitHub adapter
 export type GithubEvent = {
-  id: string           // stable identifier (html_url)
+  id: string
   type: 'release' | 'pr_merged' | 'pr_opened' | 'issue_closed' | 'issue_opened' | 'commit'
   title: string
   body?: string

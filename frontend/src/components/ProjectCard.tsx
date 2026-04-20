@@ -1,5 +1,14 @@
 import type { Project } from '../api/client'
 
+function projectSubtitle(project: Project): string {
+  if (project.source === 'jira') {
+    return project.sourceConfig.jiraProjectKey ?? 'Jira'
+  }
+  const { repoOwner, repoName } = project.sourceConfig
+  if (repoOwner && repoName) return `${repoOwner}/${repoName}`
+  return ''
+}
+
 export default function ProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
   return (
     <button
@@ -9,9 +18,12 @@ export default function ProjectCard({ project, onClick }: { project: Project; on
       <div className="flex items-center justify-between">
         <div>
           <p className="font-semibold text-white">{project.name}</p>
-          <p className="text-brand-accent/70 text-sm mt-0.5">{project.repoOwner}/{project.repoName}</p>
+          <p className="text-brand-accent/70 text-sm mt-0.5">{projectSubtitle(project)}</p>
         </div>
-        <span className="text-brand-light">→</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-brand-light/40 uppercase tracking-wide">{project.source}</span>
+          <span className="text-brand-light">→</span>
+        </div>
       </div>
     </button>
   )

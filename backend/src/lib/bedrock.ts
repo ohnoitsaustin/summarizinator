@@ -1,5 +1,5 @@
 import { BedrockRuntimeClient, InvokeModelCommand } from '@aws-sdk/client-bedrock-runtime'
-import type { GithubEvent, AudienceMode } from '../types'
+import type { Event, AudienceMode } from '../types'
 import type { RiskSignals } from './riskAnalysis'
 import { postprocessContent } from './postprocessing'
 
@@ -46,7 +46,7 @@ Required sections: Wins, In Progress, Risks / Blockers, Scope Changes`
 }
 
 function buildUserPrompt(
-  events: GithubEvent[],
+  events: Event[],
   label: string,
   context: string | undefined,
   signals: RiskSignals,
@@ -61,12 +61,12 @@ function buildUserPrompt(
     : ''
 
   const signalLines = [
-    `Merged PRs: ${signals.mergedPrCount}`,
-    `Open PRs: ${signals.openPrCount} (${signals.staleOpenPrCount} stale >3 days)`,
-    `Opened issues: ${signals.openedIssueCount}`,
-    `Closed issues: ${signals.closedIssueCount}`,
-    `Commits: ${signals.commitCount}`,
-    signals.hasReviewBottleneck ? '⚠ Review bottleneck detected' : null,
+    `Completed: ${signals.completedCount}`,
+    `In progress: ${signals.inProgressCount} (${signals.staleCount} stale >3 days)`,
+    `Newly created: ${signals.createdCount}`,
+    `Blocked: ${signals.blockedCount}`,
+    `Updates/commits: ${signals.updatedCount}`,
+    signals.hasReviewBottleneck ? '⚠ Review/progress bottleneck detected' : null,
     signals.hasLowCompletionSignal ? '⚠ Low completion signal' : null,
     signals.hasPotentialScopeExpansion ? '⚠ Potential scope expansion' : null,
     signals.hasFragmentedExecution ? '⚠ Fragmented execution pattern' : null,
@@ -104,7 +104,7 @@ Write the update in markdown using exactly these headers:
 type BedrockResponse = { content: { type: string; text: string }[] }
 
 export async function generateUpdate(
-  events: GithubEvent[],
+  events: Event[],
   days: number,
   audience: AudienceMode,
   context?: string,
@@ -113,8 +113,8 @@ export async function generateUpdate(
   const label = periodLabel(days)
   const systemPrompt = buildSystemPrompt(label, audience)
   const userPrompt = buildUserPrompt(events, label, context, signals ?? {
-    mergedPrCount: 0, openPrCount: 0, openedIssueCount: 0, closedIssueCount: 0, commitCount: 0,
-    staleOpenPrCount: 0, staleOpenIssueCount: 0,
+    completedCount: 0, inProgressCount: 0, createdCount: 0, updatedCount: 0, blockedCount: 0,
+    staleCount: 0,
     hasHighWorkInProgress: false, hasReviewBottleneck: false, hasLowCompletionSignal: false,
     hasPotentialScopeExpansion: false, hasFragmentedExecution: false, hasDeliveryCompressionRisk: false,
     inferredRisks: [],
