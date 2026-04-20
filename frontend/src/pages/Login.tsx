@@ -16,9 +16,13 @@ export default function Login() {
   const [step, setStep] = useState<Step>('form')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState(authError ?? '')
   const [loading, setLoading] = useState(false)
+
+  const passwordLongEnough = password.length >= 14
+  const passwordsMatch = confirm === password && password.length > 0
 
   useEffect(() => {
     if (user) navigate('/dashboard', { replace: true })
@@ -27,6 +31,10 @@ export default function Login() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (mode === 'signup' && !passwordsMatch) {
+      setError('Passwords do not match')
+      return
+    }
     setLoading(true)
     try {
       if (mode === 'signin') {
@@ -72,6 +80,7 @@ export default function Login() {
     setStep('form')
     setError('')
     setCode('')
+    setConfirm('')
   }
 
   if (step === 'verify') {
@@ -147,14 +156,38 @@ export default function Login() {
             className="w-full px-4 py-3 bg-brand-light/20 border border-brand-light/30 rounded-lg text-white placeholder-brand-accent/40 focus:outline-none focus:border-brand-cta"
             required
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            className="w-full px-4 py-3 bg-brand-light/20 border border-brand-light/30 rounded-lg text-white placeholder-brand-accent/40 focus:outline-none focus:border-brand-cta"
-            required
-          />
+          <div className="space-y-1">
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-4 py-3 bg-brand-light/20 border border-brand-light/30 rounded-lg text-white placeholder-brand-accent/40 focus:outline-none focus:border-brand-cta"
+              required
+            />
+            {mode === 'signup' && (
+              <p className={`text-xs px-1 transition-colors ${passwordLongEnough ? 'text-green-400' : 'text-brand-accent/50'}`}>
+                {passwordLongEnough ? '✓' : '·'} At least 14 characters
+              </p>
+            )}
+          </div>
+          {mode === 'signup' && (
+            <div className="space-y-1">
+              <input
+                type="password"
+                placeholder="Confirm password"
+                value={confirm}
+                onChange={e => setConfirm(e.target.value)}
+                className="w-full px-4 py-3 bg-brand-light/20 border border-brand-light/30 rounded-lg text-white placeholder-brand-accent/40 focus:outline-none focus:border-brand-cta"
+                required
+              />
+              {confirm.length > 0 && (
+                <p className={`text-xs px-1 transition-colors ${passwordsMatch ? 'text-green-400' : 'text-red-400/70'}`}>
+                  {passwordsMatch ? '✓ Passwords match' : '· Passwords do not match'}
+                </p>
+              )}
+            </div>
+          )}
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             type="submit"

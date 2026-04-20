@@ -29,6 +29,7 @@ jobs:
         run: npm run build --workspace=frontend
         env:
           VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID_DEV }}
+          VITE_JIRA_CLIENT_ID: ${{ secrets.JIRA_CLIENT_ID_DEV }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
