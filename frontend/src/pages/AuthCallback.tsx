@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { api } from '../api/client'
 
 export default function AuthCallback() {
-  const { login } = useAuth()
+  const { refreshUser } = useAuth()
   const navigate = useNavigate()
   const called = useRef(false)
 
@@ -12,20 +11,12 @@ export default function AuthCallback() {
     if (called.current) return
     called.current = true
 
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (!code) {
-      navigate('/login', { replace: true })
-      return
-    }
-
-    api.auth
-      .token(code)
-      .then(({ token, user }) => {
-        login(token, user)
-        navigate('/dashboard', { replace: true })
-      })
-      .catch(() => navigate('/login', { replace: true, state: { error: 'GitHub sign-in failed. Please try again.' } }))
-  }, [login, navigate])
+    // Amplify has already exchanged the OAuth code by the time this component mounts.
+    // We just need to reload the user session and redirect.
+    refreshUser()
+      .then(() => navigate('/dashboard', { replace: true }))
+      .catch(() => navigate('/login', { replace: true, state: { error: 'Sign-in failed. Please try again.' } }))
+  }, [refreshUser, navigate])
 
   return (
     <div className="min-h-screen bg-brand-bg flex items-center justify-center">

@@ -1,8 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getUserById, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
+import { getProject, getSourceConnection, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
 import type { GithubEvent, AudienceMode } from '../types'
-import { verifyToken } from '../lib/jwt'
 import { fetchRepoEvents } from '../lib/github'
 import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
@@ -28,14 +27,12 @@ const err = (status: number, message: string): APIGatewayProxyResultV2 => ({
   body: JSON.stringify({ message }),
 })
 
-function getUser(event: APIGatewayProxyEventV2) {
-  try {
-    const header = event.headers.authorization ?? ''
-    const token = header.startsWith('Bearer ') ? header.slice(7) : ''
-    return verifyToken(token)
-  } catch {
-    return null
+function getUserId(event: APIGatewayProxyEventV2): string | null {
+  const ctx = event.requestContext as unknown as {
+    authorizer?: { jwt?: { claims?: Record<string, unknown> } }
   }
+  const sub = ctx.authorizer?.jwt?.claims?.sub
+  return typeof sub === 'string' ? sub : null
 }
 
 function parseAudience(value: unknown): AudienceMode {
@@ -54,18 +51,18 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   }
   if (!body.projectId) return err(400, 'Missing projectId')
 
-  const [project, user] = await Promise.all([
+  const [project, connection] = await Promise.all([
     getProject(userId, body.projectId),
-    getUserById(userId),
+    getSourceConnection(userId, 'github'),
   ])
   if (!project) return err(404, 'Project not found')
-  if (!user) return err(404, 'User not found')
+  if (!connection) return err(400, 'GitHub not connected. Connect your GitHub account first.')
 
   const days = body.days ?? 7
   const audience = parseAudience(body.audience)
   const context = body.context?.trim() || undefined
 
-  const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
+  const rawEvents = await fetchRepoEvents(connection.accessToken, project.repoOwner, project.repoName, days)
   const hiddenSet = new Set(body.hiddenIds ?? [])
   const highlightedSet = new Set(body.highlightedIds ?? [])
   const events = preprocessEvents(rawEvents)
@@ -76,7 +73,6 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
 
   return ok({ content, events, audience, generationContext: context })
 }
-
 
 async function handleSaveUpdate(event: APIGatewayProxyEventV2, userId: string): Promise<APIGatewayProxyResultV2> {
   const body = JSON.parse(event.body ?? '{}') as {
@@ -165,30 +161,30 @@ async function handleFetchEvents(event: APIGatewayProxyEventV2, userId: string):
   const days = parseInt(event.queryStringParameters?.days ?? '7', 10)
   if (!projectId) return err(400, 'Missing projectId')
 
-  const [project, user] = await Promise.all([
+  const [project, connection] = await Promise.all([
     getProject(userId, projectId),
-    getUserById(userId),
+    getSourceConnection(userId, 'github'),
   ])
   if (!project) return err(404, 'Project not found')
-  if (!user) return err(404, 'User not found')
+  if (!connection) return err(400, 'GitHub not connected. Connect your GitHub account first.')
 
-  const rawEvents = await fetchRepoEvents(user.githubAccessToken, project.repoOwner, project.repoName, days)
+  const rawEvents = await fetchRepoEvents(connection.accessToken, project.repoOwner, project.repoName, days)
   const events = preprocessEvents(rawEvents)
   return ok({ events, days })
 }
 
 export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
-  const user = getUser(event)
-  if (!user) return err(401, 'Unauthorized')
+  const userId = getUserId(event)
+  if (!userId) return err(401, 'Unauthorized')
 
   try {
     const route = event.routeKey
-    if (route === 'POST /api/updates/generate') return handleGenerate(event, user.sub)
-if (route === 'POST /api/updates/save') return handleSaveUpdate(event, user.sub)
-    if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, user.sub)
-    if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, user.sub)
-    if (route === 'DELETE /api/updates/{id}') return handleDeleteUpdate(event, user.sub)
-    if (route === 'PATCH /api/updates/{id}') return handlePatchUpdate(event, user.sub)
+    if (route === 'POST /api/updates/generate') return handleGenerate(event, userId)
+    if (route === 'POST /api/updates/save') return handleSaveUpdate(event, userId)
+    if (route === 'GET /api/projects/{projectId}/updates') return handleListUpdates(event, userId)
+    if (route === 'GET /api/projects/{projectId}/events') return handleFetchEvents(event, userId)
+    if (route === 'DELETE /api/updates/{id}') return handleDeleteUpdate(event, userId)
+    if (route === 'PATCH /api/updates/{id}') return handlePatchUpdate(event, userId)
     return err(404, 'Not found')
   } catch (e) {
     console.error(e)

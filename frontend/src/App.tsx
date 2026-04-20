@@ -4,12 +4,14 @@ import AppLayout from './components/AppLayout'
 import HomePage from './pages/HomePage'
 import Login from './pages/Login'
 import AuthCallback from './pages/AuthCallback'
+import ConnectGitHub from './pages/ConnectGitHub'
 import Dashboard from './pages/Dashboard'
 import ProjectPage from './pages/ProjectPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuth()
-  return token ? <AppLayout>{children}</AppLayout> : <Navigate to="/" replace />
+  const { user, loading } = useAuth()
+  if (loading) return null
+  return user ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" replace />
 }
 
 export default function App() {
@@ -20,6 +22,7 @@ export default function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/auth/callback" element={<AuthCallback />} />
+          <Route path="/connect/github/callback" element={<ConnectGitHub />} />
           <Route
             path="/dashboard"
             element={

@@ -5,8 +5,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    await logout()
     navigate('/login')
   }
 
@@ -20,7 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           Summarizinator
         </button>
         <div className="flex items-center gap-4">
-          <span className="text-brand-accent/70 text-sm">@{user?.githubLogin}</span>
+          <span className="text-brand-accent/70 text-sm">{user?.email}</span>
           <button onClick={handleLogout} className="text-sm text-brand-light hover:text-white transition-colors">
             Sign out
           </button>

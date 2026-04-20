@@ -1,5 +1,16 @@
+import { fetchAuthSession } from 'aws-amplify/auth'
+
+async function getToken(): Promise<string | null> {
+  try {
+    const session = await fetchAuthSession()
+    return session.tokens?.idToken?.toString() ?? null
+  } catch {
+    return null
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem('token')
+  const token = await getToken()
   const res = await fetch(path, {
     ...options,
     headers: {
@@ -53,14 +64,23 @@ type GenerateResult = {
   generationContext?: string
 }
 
+type Connection = {
+  source: string
+  connectedAt: string
+  githubLogin?: string
+}
 
 export const api = {
-  auth: {
-    token: (code: string) =>
-      request<{ token: string; user: { id: string; email: string; githubLogin: string } }>(
-        '/api/auth/token',
+  connections: {
+    list: () => request<Connection[]>('/api/connections'),
+    getGitHub: () => request<Connection>('/api/connections/github'),
+    connectGitHub: (code: string) =>
+      request<{ source: string; connected: boolean; githubLogin: string }>(
+        '/api/connections/github',
         { method: 'POST', body: JSON.stringify({ code }) },
       ),
+    disconnectGitHub: () =>
+      request<{ disconnected: boolean }>('/api/connections/github', { method: 'DELETE' }),
   },
   projects: {
     list: () => request<Project[]>('/api/projects'),

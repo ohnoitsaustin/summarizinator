@@ -1,10 +1,13 @@
-export type User = {
-  id: string
-  email: string
-  githubLogin: string
-  githubAccessToken: string
-  githubTokenExpiry: string | null
-  createdAt: string
+export type SourceConnection = {
+  userId: string
+  source: 'github' | 'jira'
+  accessToken: string
+  refreshToken?: string
+  expiresAt?: string
+  githubLogin?: string
+  jiraCloudId?: string
+  jiraDomain?: string
+  connectedAt: string
 }
 
 export type Project = {

@@ -1,39 +1,42 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb'
-import type { User, Project, Update } from '../types'
+import type { SourceConnection, Project, Update } from '../types'
 
 const TABLE = process.env.DYNAMODB_TABLE_NAME!
 const client = DynamoDBDocumentClient.from(new DynamoDBClient({}))
 
-export async function getUserById(id: string): Promise<User | null> {
+export async function getSourceConnection(userId: string, source: SourceConnection['source']): Promise<SourceConnection | null> {
   const res = await client.send(new GetCommand({
     TableName: TABLE,
-    Key: { PK: `USER#${id}`, SK: '#METADATA' },
+    Key: { PK: `USER#${userId}`, SK: `CONNECTION#${source}` },
   }))
-  return res.Item ? (res.Item as User) : null
+  return res.Item ? (res.Item as SourceConnection) : null
 }
 
-export async function getUserByEmail(email: string): Promise<User | null> {
+export async function listSourceConnections(userId: string): Promise<SourceConnection[]> {
   const res = await client.send(new QueryCommand({
     TableName: TABLE,
-    IndexName: 'GSI1',
-    KeyConditionExpression: 'GSI1PK = :pk',
-    ExpressionAttributeValues: { ':pk': `EMAIL#${email}` },
-    Limit: 1,
+    KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+    ExpressionAttributeValues: { ':pk': `USER#${userId}`, ':sk': 'CONNECTION#' },
   }))
-  return res.Items?.[0] ? (res.Items[0] as User) : null
+  return (res.Items ?? []) as SourceConnection[]
 }
 
-export async function upsertUser(user: User): Promise<void> {
+export async function upsertSourceConnection(conn: SourceConnection): Promise<void> {
   await client.send(new PutCommand({
     TableName: TABLE,
     Item: {
-      PK: `USER#${user.id}`,
-      SK: '#METADATA',
-      GSI1PK: `EMAIL#${user.email}`,
-      GSI1SK: `USER#${user.id}`,
-      ...user,
+      PK: `USER#${conn.userId}`,
+      SK: `CONNECTION#${conn.source}`,
+      ...conn,
     },
+  }))
+}
+
+export async function deleteSourceConnection(userId: string, source: SourceConnection['source']): Promise<void> {
+  await client.send(new DeleteCommand({
+    TableName: TABLE,
+    Key: { PK: `USER#${userId}`, SK: `CONNECTION#${source}` },
   }))
 }
 
@@ -109,7 +112,6 @@ export async function patchUpdateContent(projectId: string, updateId: string, co
     ExpressionAttributeValues: { ':content': content },
   }))
 }
-
 
 export async function patchProject(userId: string, projectId: string, fields: { name: string; repoOwner: string; repoName: string }): Promise<void> {
   await client.send(new UpdateCommand({

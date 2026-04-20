@@ -10,24 +10,37 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda'
 
 const PORT = 3001
 
+// Decode JWT payload without signature verification — local dev only
+function decodeJwtClaims(token: string): Record<string, unknown> | null {
+  try {
+    const payload = token.split('.')[1]
+    return JSON.parse(Buffer.from(payload, 'base64url').toString())
+  } catch {
+    return null
+  }
+}
+
 ;(async () => {
-  const { handler: authHandler } = await import('./src/handlers/auth')
+  const { handler: connectionsHandler } = await import('./src/handlers/connections')
   const { handler: projectsHandler } = await import('./src/handlers/projects')
   const { handler: updatesHandler } = await import('./src/handlers/updates')
 
-  type Handler = typeof authHandler
+  type Handler = typeof connectionsHandler
 
   const ROUTES: Array<{ method: string; pattern: string; handler: Handler }> = [
-    { method: 'POST',   pattern: '/api/auth/token',                    handler: authHandler },
-    { method: 'GET',    pattern: '/api/projects',                      handler: projectsHandler },
-    { method: 'POST',   pattern: '/api/projects',                      handler: projectsHandler },
-    { method: 'PATCH',  pattern: '/api/projects/{id}',                 handler: projectsHandler },
-    { method: 'POST',   pattern: '/api/updates/generate',              handler: updatesHandler },
-    { method: 'POST',   pattern: '/api/updates/save',                  handler: updatesHandler },
-    { method: 'GET',    pattern: '/api/projects/{projectId}/updates',  handler: updatesHandler },
-    { method: 'GET',    pattern: '/api/projects/{projectId}/events',   handler: updatesHandler },
-    { method: 'DELETE', pattern: '/api/updates/{id}',                  handler: updatesHandler },
-    { method: 'PATCH',  pattern: '/api/updates/{id}',                  handler: updatesHandler },
+    { method: 'GET',    pattern: '/api/connections',                  handler: connectionsHandler },
+    { method: 'GET',    pattern: '/api/connections/github',           handler: connectionsHandler },
+    { method: 'POST',   pattern: '/api/connections/github',           handler: connectionsHandler },
+    { method: 'DELETE', pattern: '/api/connections/github',           handler: connectionsHandler },
+    { method: 'GET',    pattern: '/api/projects',                     handler: projectsHandler },
+    { method: 'POST',   pattern: '/api/projects',                     handler: projectsHandler },
+    { method: 'PATCH',  pattern: '/api/projects/{id}',                handler: projectsHandler },
+    { method: 'POST',   pattern: '/api/updates/generate',             handler: updatesHandler },
+    { method: 'POST',   pattern: '/api/updates/save',                 handler: updatesHandler },
+    { method: 'GET',    pattern: '/api/projects/{projectId}/updates', handler: updatesHandler },
+    { method: 'GET',    pattern: '/api/projects/{projectId}/events',  handler: updatesHandler },
+    { method: 'DELETE', pattern: '/api/updates/{id}',                 handler: updatesHandler },
+    { method: 'PATCH',  pattern: '/api/updates/{id}',                 handler: updatesHandler },
   ]
 
   function matchRoute(method: string, path: string) {
@@ -81,6 +94,10 @@ const PORT = 3001
       if (typeof v === 'string') headers[k] = v
     }
 
+    const authHeader = headers['authorization'] ?? ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : ''
+    const claims = token ? decodeJwtClaims(token) : null
+
     const event = {
       routeKey: matched.routeKey,
       rawPath: url.pathname,
@@ -90,7 +107,10 @@ const PORT = 3001
       queryStringParameters: Object.fromEntries(url.searchParams),
       body: body || undefined,
       isBase64Encoded: false,
-      requestContext: { http: { method } },
+      requestContext: {
+        http: { method },
+        ...(claims ? { authorizer: { jwt: { claims } } } : {}),
+      },
     } as APIGatewayProxyEventV2
 
     try {

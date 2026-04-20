@@ -1,10 +1,12 @@
 import * as path from 'path'
 import * as cdk from 'aws-cdk-lib'
 import * as acm from 'aws-cdk-lib/aws-certificatemanager'
+import * as cognito from 'aws-cdk-lib/aws-cognito'
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import * as lambda from 'aws-cdk-lib/aws-lambda'
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs'
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2'
+import { HttpJwtAuthorizer } from 'aws-cdk-lib/aws-apigatewayv2-authorizers'
 import { HttpLambdaIntegration } from 'aws-cdk-lib/aws-apigatewayv2-integrations'
 import * as s3 from 'aws-cdk-lib/aws-s3'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
@@ -14,9 +16,10 @@ import * as iam from 'aws-cdk-lib/aws-iam'
 import { Construct } from 'constructs'
 
 // Prerequisites per environment — create these SSM parameters before first deploy:
-//   /summarizinator/{env}/github-client-id
+//   /summarizinator/{env}/github-client-id       (GitHub OAuth app for data source connections)
 //   /summarizinator/{env}/github-client-secret
-//   /summarizinator/{env}/jwt-secret
+//   /summarizinator/{env}/google-client-id       (Google OAuth app for Cognito federated login)
+//   /summarizinator/{env}/google-client-secret   (SecureString)
 //
 // Also required: ACM certificate in us-east-1 covering the domain, passed via certArn.
 
@@ -51,9 +54,82 @@ export class SummarizinatorStack extends cdk.Stack {
       sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
     })
 
+    // ── Cognito ─────────────────────────────────────────────────────────────
+
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      userPoolName: `summarizinator-${config.stackEnv}`,
+      selfSignUpEnabled: true,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      standardAttributes: {
+        email: { required: true, mutable: true },
+        fullname: { required: false, mutable: true },
+      },
+      passwordPolicy: {
+        minLength: 8,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireDigits: false,
+        requireSymbols: false,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: cdk.RemovalPolicy.RETAIN,
+    })
+
+    const googleClientId = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/google-client-id`)
+    const googleClientSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/google-client-secret`)
+    const googleProvider = new cognito.UserPoolIdentityProviderGoogle(this, 'GoogleProvider', {
+      userPool,
+      clientId: googleClientId,
+      clientSecretValue: cdk.SecretValue.unsafePlainText(googleClientSecret),
+      scopes: ['email', 'profile', 'openid'],
+      attributeMapping: {
+        email: cognito.ProviderAttribute.GOOGLE_EMAIL,
+        fullname: cognito.ProviderAttribute.GOOGLE_NAME,
+      },
+    })
+
+    const userPoolClient = new cognito.UserPoolClient(this, 'UserPoolClient', {
+      userPool,
+      userPoolClientName: `summarizinator-spa-${config.stackEnv}`,
+      generateSecret: false,
+      authFlows: {
+        userSrp: true,
+        userPassword: false,
+      },
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.PROFILE,
+        ],
+        callbackUrls: [
+          'http://localhost:5173/auth/callback',
+          `https://${config.domainName}/auth/callback`,
+        ],
+        logoutUrls: [
+          'http://localhost:5173',
+          `https://${config.domainName}`,
+        ],
+      },
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+        cognito.UserPoolClientIdentityProvider.GOOGLE,
+      ],
+      preventUserExistenceErrors: true,
+    })
+    userPoolClient.node.addDependency(googleProvider)
+
+    new cognito.UserPoolDomain(this, 'UserPoolDomain', {
+      userPool,
+      cognitoDomain: { domainPrefix: `summarizinator-${config.stackEnv}` },
+    })
+
+    // ── Lambda functions ─────────────────────────────────────────────────────
+
     const githubClientId = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-id`)
     const githubClientSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/github-client-secret`)
-    const jwtSecret = ssm.StringParameter.valueForStringParameter(this, `${ssmPrefix}/jwt-secret`)
 
     const handlerDir = path.join(__dirname, '../../backend/src/handlers')
 
@@ -69,20 +145,19 @@ export class SummarizinatorStack extends cdk.Stack {
       },
       environment: {
         DYNAMODB_TABLE_NAME: table.tableName,
-        JWT_SECRET: jwtSecret,
       },
     }
 
-    const authFn = new NodejsFunction(this, 'AuthFn', {
+    const connectionsFn = new NodejsFunction(this, 'ConnectionsFn', {
       ...lambdaDefaults,
-      entry: path.join(handlerDir, 'auth.ts'),
+      entry: path.join(handlerDir, 'connections.ts'),
       environment: {
         ...lambdaDefaults.environment,
         GITHUB_CLIENT_ID: githubClientId,
         GITHUB_CLIENT_SECRET: githubClientSecret,
       },
     })
-    table.grantReadWriteData(authFn)
+    table.grantReadWriteData(connectionsFn)
 
     const projectsFn = new NodejsFunction(this, 'ProjectsFn', {
       ...lambdaDefaults,
@@ -111,6 +186,8 @@ export class SummarizinatorStack extends cdk.Stack {
       resources: ['*'],
     }))
 
+    // ── API Gateway ──────────────────────────────────────────────────────────
+
     const api = new apigwv2.HttpApi(this, 'Api', {
       apiName: `summarizinator-api-${config.stackEnv}`,
       corsPreflight: {
@@ -120,13 +197,30 @@ export class SummarizinatorStack extends cdk.Stack {
       },
     })
 
-    api.addRoutes({ path: '/api/auth/token', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('AuthInt', authFn) })
-    api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('ProjectsInt', projectsFn) })
-    api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesGenerateInt', updatesFn) })
-api.addRoutes({ path: '/api/updates/save', methods: [apigwv2.HttpMethod.POST], integration: new HttpLambdaIntegration('UpdatesSaveInt', updatesFn) })
-    api.addRoutes({ path: '/api/projects/{projectId}/updates', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectUpdatesInt', updatesFn) })
-    api.addRoutes({ path: '/api/projects/{projectId}/events', methods: [apigwv2.HttpMethod.GET], integration: new HttpLambdaIntegration('ProjectEventsInt', updatesFn) })
-    api.addRoutes({ path: '/api/updates/{id}', methods: [apigwv2.HttpMethod.DELETE, apigwv2.HttpMethod.PATCH], integration: new HttpLambdaIntegration('UpdateCrudInt', updatesFn) })
+    const authorizer = new HttpJwtAuthorizer(
+      'CognitoAuthorizer',
+      `https://cognito-idp.${this.region}.amazonaws.com/${userPool.userPoolId}`,
+      {
+        identitySource: ['$request.header.Authorization'],
+        jwtAudience: [userPoolClient.userPoolClientId],
+      },
+    )
+
+    const connectionsInt = new HttpLambdaIntegration('ConnectionsInt', connectionsFn)
+    const projectsInt = new HttpLambdaIntegration('ProjectsInt', projectsFn)
+    const updatesInt = new HttpLambdaIntegration('UpdatesInt', updatesFn)
+
+    api.addRoutes({ path: '/api/connections', methods: [apigwv2.HttpMethod.GET], integration: connectionsInt, authorizer })
+    api.addRoutes({ path: '/api/connections/github', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST, apigwv2.HttpMethod.DELETE], integration: connectionsInt, authorizer })
+    api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: projectsInt, authorizer })
+    api.addRoutes({ path: '/api/projects/{id}', methods: [apigwv2.HttpMethod.PATCH], integration: projectsInt, authorizer })
+    api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: updatesInt, authorizer })
+    api.addRoutes({ path: '/api/updates/save', methods: [apigwv2.HttpMethod.POST], integration: updatesInt, authorizer })
+    api.addRoutes({ path: '/api/projects/{projectId}/updates', methods: [apigwv2.HttpMethod.GET], integration: updatesInt, authorizer })
+    api.addRoutes({ path: '/api/projects/{projectId}/events', methods: [apigwv2.HttpMethod.GET], integration: updatesInt, authorizer })
+    api.addRoutes({ path: '/api/updates/{id}', methods: [apigwv2.HttpMethod.DELETE, apigwv2.HttpMethod.PATCH], integration: updatesInt, authorizer })
+
+    // ── CloudFront + S3 ──────────────────────────────────────────────────────
 
     const siteBucket = new s3.Bucket(this, 'SiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
@@ -166,5 +260,8 @@ api.addRoutes({ path: '/api/updates/save', methods: [apigwv2.HttpMethod.POST], i
     new cdk.CfnOutput(this, 'AppUrl', { value: `https://${config.domainName}` })
     new cdk.CfnOutput(this, 'CloudFrontDomain', { value: distribution.distributionDomainName, description: 'Point your DNS CNAME here' })
     new cdk.CfnOutput(this, 'ApiEndpoint', { value: api.apiEndpoint })
+    new cdk.CfnOutput(this, 'UserPoolId', { value: userPool.userPoolId })
+    new cdk.CfnOutput(this, 'UserPoolClientId', { value: userPoolClient.userPoolClientId })
+    new cdk.CfnOutput(this, 'CognitoDomain', { value: `summarizinator-${config.stackEnv}.auth.${this.region}.amazoncognito.com` })
   }
 }

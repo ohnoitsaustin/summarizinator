@@ -1,39 +1,44 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
+import { getCurrentUser, fetchAuthSession, signOut } from 'aws-amplify/auth'
 
-type AuthUser = { id: string; email: string; githubLogin: string }
+export type AuthUser = { id: string; email: string }
 
 type AuthContextType = {
-  token: string | null
   user: AuthUser | null
-  login: (token: string, user: AuthUser) => void
-  logout: () => void
+  loading: boolean
+  logout: () => Promise<void>
+  refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    const stored = localStorage.getItem('user')
-    return stored ? (JSON.parse(stored) as AuthUser) : null
-  })
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  function login(t: string, u: AuthUser) {
-    localStorage.setItem('token', t)
-    localStorage.setItem('user', JSON.stringify(u))
-    setToken(t)
-    setUser(u)
+  async function loadUser() {
+    try {
+      const cognitoUser = await getCurrentUser()
+      const session = await fetchAuthSession()
+      const claims = session.tokens?.idToken?.payload
+      const email = (claims?.email as string | undefined) ?? cognitoUser.signInDetails?.loginId ?? ''
+      setUser({ id: cognitoUser.userId, email })
+    } catch {
+      setUser(null)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  function logout() {
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
-    setToken(null)
+  useEffect(() => { loadUser() }, [])
+
+  async function logout() {
+    await signOut()
     setUser(null)
   }
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, logout, refreshUser: loadUser }}>
       {children}
     </AuthContext.Provider>
   )
