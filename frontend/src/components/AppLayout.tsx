@@ -21,6 +21,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </button>
         <div className="flex items-center gap-4">
           <span className="text-brand-accent/70 text-sm">{user?.email}</span>
+          <button onClick={() => navigate('/settings')} className="text-sm text-brand-light hover:text-white transition-colors">
+            Settings
+          </button>
           <button onClick={handleLogout} className="text-sm text-brand-light hover:text-white transition-colors">
             Sign out
           </button>

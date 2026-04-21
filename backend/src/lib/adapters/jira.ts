@@ -92,23 +92,43 @@ function extractText(description: unknown): string | undefined {
   return text || undefined
 }
 
-export async function jiraFetchEvents(project: Project, connection: SourceConnection, days: number): Promise<Event[]> {
+async function doJiraSearch(jiraCloudId: string, accessToken: string, jql: string): Promise<Response> {
+  return fetch(`https://api.atlassian.com/ex/jira/${jiraCloudId}/rest/api/3/search/jql`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jql,
+      maxResults: 100,
+      fields: ['summary', 'description', 'status', 'assignee', 'creator', 'reporter', 'created', 'updated', 'labels'],
+    }),
+  })
+}
+
+export async function jiraFetchEvents(project: Project, connection: SourceConnection, days: number): Promise<{ events: Event[]; freshConnection?: SourceConnection }> {
   const { jiraProjectKey, jiraCloudId } = project.sourceConfig
   if (!jiraProjectKey || !jiraCloudId) throw new Error('Jira project missing jiraProjectKey or jiraCloudId')
 
-  const jql = encodeURIComponent(`project = "${jiraProjectKey}" AND updated >= -${days}d ORDER BY updated DESC`)
-  const fields = 'summary,description,status,assignee,creator,reporter,created,updated,labels'
-  const url = `https://api.atlassian.com/ex/jira/${jiraCloudId}/rest/api/3/search?jql=${jql}&maxResults=100&fields=${fields}`
+  const jql = `project = "${jiraProjectKey}" AND updated >= -${days}d ORDER BY updated DESC`
+  let res = await doJiraSearch(jiraCloudId, connection.accessToken, jql)
 
-  const res = await fetch(url, {
-    headers: { Authorization: `Bearer ${connection.accessToken}`, Accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`Jira search failed: ${res.status}`)
+  let freshConnection: SourceConnection | undefined
+  if (res.status === 401 && connection.refreshToken) {
+    console.log('[jira] 401 on search, forcing token refresh')
+    const refreshed = await jiraRefreshToken(connection.refreshToken)
+    freshConnection = { ...connection, accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt }
+    res = await doJiraSearch(jiraCloudId, freshConnection.accessToken, jql)
+  }
+
+  if (!res.ok) {
+    const body = await res.text()
+    console.error('[jira] search failed:', res.status, body)
+    throw new Error(`Jira search failed: ${res.status}`)
+  }
   const data = await res.json() as { issues: JiraIssue[] }
 
   const domain = connection.jiraDomain ?? `https://atlassian.net`
 
-  return data.issues.map(issue => ({
+  const events = data.issues.map(issue => ({
     id: issue.key,
     source: 'jira' as const,
     type: mapJiraStatus(issue.fields.status.name),
@@ -122,4 +142,5 @@ export async function jiraFetchEvents(project: Project, connection: SourceConnec
     labels: issue.fields.labels?.length ? issue.fields.labels : undefined,
     url: `${domain}/browse/${issue.key}`,
   }))
+  return { events, freshConnection }
 }

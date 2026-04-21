@@ -100,6 +100,8 @@ export const api = {
       ),
     disconnectJira: () =>
       request<{ disconnected: boolean }>('/api/connections/jira', { method: 'DELETE' }),
+    getJiraProjects: () =>
+      request<Array<{ key: string; name: string }>>('/api/connections/jira/projects'),
   },
   projects: {
     list: () => request<Project[]>('/api/projects'),

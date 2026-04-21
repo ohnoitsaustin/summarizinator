@@ -23,7 +23,9 @@ export async function fetchEvents(
   }
   if (project.source === 'jira') {
     const conn = await maybeRefreshJira(connection)
-    return jiraFetchEvents(project, conn, days)
+    const { events, freshConnection } = await jiraFetchEvents(project, conn, days)
+    if (freshConnection) await upsertSourceConnection(freshConnection)
+    return events
   }
   throw new Error(`Unknown source: ${(project as Project).source}`)
 }

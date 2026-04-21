@@ -217,6 +217,7 @@ export class SummarizinatorStack extends cdk.Stack {
     api.addRoutes({ path: '/api/connections', methods: [apigwv2.HttpMethod.GET], integration: connectionsInt, authorizer })
     api.addRoutes({ path: '/api/connections/github', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST, apigwv2.HttpMethod.DELETE], integration: connectionsInt, authorizer })
     api.addRoutes({ path: '/api/connections/jira', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST, apigwv2.HttpMethod.DELETE], integration: connectionsInt, authorizer })
+    api.addRoutes({ path: '/api/connections/jira/projects', methods: [apigwv2.HttpMethod.GET], integration: connectionsInt, authorizer })
     api.addRoutes({ path: '/api/projects', methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST], integration: projectsInt, authorizer })
     api.addRoutes({ path: '/api/projects/{id}', methods: [apigwv2.HttpMethod.PATCH], integration: projectsInt, authorizer })
     api.addRoutes({ path: '/api/updates/generate', methods: [apigwv2.HttpMethod.POST], integration: updatesInt, authorizer })

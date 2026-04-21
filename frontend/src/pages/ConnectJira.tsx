@@ -9,7 +9,7 @@ export function initiateJiraConnect() {
   const params = new URLSearchParams({
     audience: 'api.atlassian.com',
     client_id: JIRA_CLIENT_ID,
-    scope: 'read:jira-work read:jira-user offline_access',
+    scope: 'read:issue-details:jira read:field:jira read:field.default-value:jira read:field.option:jira read:group:jira read:project:jira offline_access',
     redirect_uri: redirectUri,
     response_type: 'code',
     prompt: 'consent',
@@ -35,7 +35,10 @@ export default function ConnectJira() {
     api.connections
       .connectJira(code, redirectUri)
       .then(() => navigate('/dashboard', { replace: true }))
-      .catch(() => navigate('/dashboard', { replace: true, state: { error: 'Failed to connect Jira. Please try again.' } }))
+      .catch(e => {
+        console.error('Jira connect failed:', e)
+        navigate('/dashboard', { replace: true, state: { jiraError: e instanceof Error ? e.message : 'Failed to connect Jira.' } })
+      })
   }, [navigate])
 
   return (

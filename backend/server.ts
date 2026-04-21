@@ -33,6 +33,7 @@ function decodeJwtClaims(token: string): Record<string, unknown> | null {
     { method: 'POST',   pattern: '/api/connections/github',           handler: connectionsHandler },
     { method: 'DELETE', pattern: '/api/connections/github',           handler: connectionsHandler },
     { method: 'GET',    pattern: '/api/connections/jira',             handler: connectionsHandler },
+    { method: 'GET',    pattern: '/api/connections/jira/projects',    handler: connectionsHandler },
     { method: 'POST',   pattern: '/api/connections/jira',             handler: connectionsHandler },
     { method: 'DELETE', pattern: '/api/connections/jira',             handler: connectionsHandler },
     { method: 'GET',    pattern: '/api/projects',                     handler: projectsHandler },

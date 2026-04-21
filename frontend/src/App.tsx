@@ -8,6 +8,7 @@ import ConnectGitHub from './pages/ConnectGitHub'
 import ConnectJira from './pages/ConnectJira'
 import Dashboard from './pages/Dashboard'
 import ProjectPage from './pages/ProjectPage'
+import Settings from './pages/Settings'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -38,6 +39,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ProjectPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <Settings />
               </ProtectedRoute>
             }
           />

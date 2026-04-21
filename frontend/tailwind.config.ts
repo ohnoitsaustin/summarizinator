@@ -5,11 +5,11 @@ export default {
   theme: {
     extend: {
       animation: {
-        shimmer: 'shimmer 2s linear infinite',
+        shimmer: 'shimmer 7s linear infinite',
       },
       keyframes: {
         shimmer: {
-          '0%':   { backgroundPosition: '200% 50%' },
+          '0%': { backgroundPosition: '200% 50%' },
           '100%': { backgroundPosition: '-200% 50%' },
         },
       },

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { api, type Project } from '../api/client'
+import { initiateJiraConnect } from './ConnectJira'
 import ProjectCard from '../components/ProjectCard'
 import LoadingDots from '../components/LoadingDots'
 
@@ -40,17 +41,20 @@ type EditForm = {
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<CreateForm>({ name: '', source: 'github', repoOwner: '', repoName: '', jiraProjectKey: '' })
   const [creating, setCreating] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>((location.state as { jiraError?: string } | null)?.jiraError ?? null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<EditForm>({ name: '', repoOwner: '', repoName: '', jiraProjectKey: '' })
   const [saving, setSaving] = useState(false)
+  const [jiraConnected, setJiraConnected] = useState<boolean | null>(null)
+  const [jiraProjects, setJiraProjects] = useState<Array<{ key: string; name: string }> | null>(null)
 
   useEffect(() => {
     api.projects.list()
@@ -58,6 +62,18 @@ export default function Dashboard() {
       .catch(() => setError('Failed to load projects'))
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (form.source !== 'jira' || jiraConnected !== null) return
+    api.connections.getJira()
+      .then(() => {
+        setJiraConnected(true)
+        api.connections.getJiraProjects()
+          .then(projects => setJiraProjects(projects))
+          .catch(() => setJiraProjects([]))
+      })
+      .catch(() => setJiraConnected(false))
+  }, [form.source, jiraConnected])
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -176,7 +192,10 @@ export default function Dashboard() {
                 <button
                   key={src}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, source: src }))}
+                  onClick={() => {
+                    setForm(f => ({ ...f, source: src }))
+                    if (src === 'jira') { setJiraConnected(null); setJiraProjects(null) }
+                  }}
                   className={`flex-1 py-2 transition-colors capitalize ${form.source === src ? 'bg-brand-cta text-brand-bg font-medium' : 'text-brand-accent/70 hover:text-white'} ${i > 0 ? 'border-l border-brand-light/30' : ''}`}
                 >
                   {src === 'github' ? 'GitHub' : 'Jira'}
@@ -209,20 +228,51 @@ export default function Dashboard() {
                   className="flex-1 bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
                 />
               </div>
-            ) : (
-              <input
+            ) : jiraConnected === false ? (
+              <div className="flex items-center gap-3 px-4 py-3 bg-brand-bg border border-brand-light/30 rounded-lg">
+                <span className="text-sm text-brand-accent/60 flex-1">Connect your Jira account first</span>
+                <button
+                  type="button"
+                  onClick={initiateJiraConnect}
+                  className="px-3 py-1.5 bg-brand-cta text-brand-bg text-xs font-medium rounded hover:bg-brand-cta/90 transition-colors"
+                >
+                  Connect Jira
+                </button>
+              </div>
+            ) : jiraProjects === null ? (
+              <div className="px-4 py-2 text-sm text-brand-accent/50">Loading projects…</div>
+            ) : jiraProjects.length > 0 ? (
+              <select
                 required
-                placeholder="Jira project key (e.g. ENG)"
                 value={form.jiraProjectKey}
-                onChange={e => setForm(f => ({ ...f, jiraProjectKey: e.target.value.toUpperCase(), name: f.name || e.target.value }))}
-                className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
-              />
+                onChange={e => {
+                  const selected = jiraProjects.find(p => p.key === e.target.value)
+                  setForm(f => ({ ...f, jiraProjectKey: e.target.value, name: f.name || selected?.name || e.target.value }))
+                }}
+                className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent text-brand-accent"
+              >
+                <option value="" disabled>Select a project</option>
+                {jiraProjects.map(p => (
+                  <option key={p.key} value={p.key}>{p.name} ({p.key})</option>
+                ))}
+              </select>
+            ) : (
+              <div className="space-y-1">
+                <input
+                  required
+                  placeholder="Project key (e.g. ENG)"
+                  value={form.jiraProjectKey}
+                  onChange={e => setForm(f => ({ ...f, jiraProjectKey: e.target.value.toUpperCase(), name: f.name || e.target.value }))}
+                  className="w-full bg-brand-bg border border-brand-light/50 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-accent placeholder:text-brand-light"
+                />
+                <p className="text-xs text-brand-accent/40 px-1">No projects found via API — enter the key manually. Check the browser console for details.</p>
+              </div>
             )}
           </div>
           <div className="flex gap-2">
             <button
               type="submit"
-              disabled={creating}
+              disabled={creating || (form.source === 'jira' && jiraConnected !== true)}
               className="px-4 py-2 bg-brand-accent hover:bg-brand-accent/80 disabled:opacity-50 rounded-lg text-sm text-brand-bg font-medium transition-colors"
             >
               {creating ? 'Creating…' : 'Create'}

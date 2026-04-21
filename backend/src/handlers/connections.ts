@@ -119,6 +119,38 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       return ok({ disconnected: true })
     }
 
+    if (route === 'GET /api/connections/jira/projects') {
+      const conn = await getSourceConnection(userId, 'jira')
+      if (!conn) return err(400, 'Jira not connected')
+      const base = `https://api.atlassian.com/ex/jira/${conn.jiraCloudId}`
+      const headers = { Authorization: `Bearer ${conn.accessToken}`, Accept: 'application/json' }
+
+      console.log('[jira/projects] cloudId:', conn.jiraCloudId)
+
+      // Try paginated search first (v3)
+      const searchRes = await fetch(`${base}/rest/api/3/project/search?maxResults=100&orderBy=name`, { headers })
+      console.log('[jira/projects] search status:', searchRes.status)
+      if (searchRes.ok) {
+        const data = await searchRes.json() as { values?: Array<{ key: string; name: string }> }
+        console.log('[jira/projects] search values count:', data.values?.length ?? 0)
+        const values = data.values ?? []
+        if (values.length > 0) return ok(values.map(p => ({ key: p.key, name: p.name })))
+      } else {
+        console.error('[jira/projects] search failed:', searchRes.status, await searchRes.text())
+      }
+
+      // Fallback: simple list endpoint (covers next-gen/team-managed projects)
+      const listRes = await fetch(`${base}/rest/api/3/project?maxResults=100`, { headers })
+      console.log('[jira/projects] list status:', listRes.status)
+      if (!listRes.ok) {
+        console.error('[jira/projects] list failed:', listRes.status, await listRes.text())
+        return err(502, `Jira API error: ${listRes.status}`)
+      }
+      const list = await listRes.json() as Array<{ key: string; name: string }>
+      console.log('[jira/projects] list count:', list.length, list.map(p => p.key))
+      return ok(list.map(p => ({ key: p.key, name: p.name })))
+    }
+
     return err(404, 'Not found')
   } catch (e) {
     console.error(e)
