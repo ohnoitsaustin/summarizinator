@@ -25,12 +25,6 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
-      - name: Build frontend
-        run: npm run build --workspace=frontend
-        env:
-          VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID_DEV }}
-          VITE_JIRA_CLIENT_ID: ${{ secrets.JIRA_CLIENT_ID_DEV }}
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -48,12 +42,22 @@ jobs:
       - name: Get stack outputs
         id: outputs
         run: |
-          BUCKET=$(aws cloudformation describe-stacks --stack-name Summarizinator-dev \
-            --query "Stacks[0].Outputs[?OutputKey=='SiteBucketName'].OutputValue" --output text)
-          DIST_ID=$(aws cloudformation describe-stacks --stack-name Summarizinator-dev \
-            --query "Stacks[0].Outputs[?OutputKey=='DistributionId'].OutputValue" --output text)
-          echo "bucket=$BUCKET" >> $GITHUB_OUTPUT
-          echo "dist_id=$DIST_ID" >> $GITHUB_OUTPUT
+          STACK=$(aws cloudformation describe-stacks --stack-name Summarizinator-dev \
+            --query "Stacks[0].Outputs" --output json)
+          echo "bucket=$(echo $STACK | jq -r '.[] | select(.OutputKey=="SiteBucketName") | .OutputValue')" >> $GITHUB_OUTPUT
+          echo "dist_id=$(echo $STACK | jq -r '.[] | select(.OutputKey=="DistributionId") | .OutputValue')" >> $GITHUB_OUTPUT
+          echo "user_pool_id=$(echo $STACK | jq -r '.[] | select(.OutputKey=="UserPoolId") | .OutputValue')" >> $GITHUB_OUTPUT
+          echo "user_pool_client_id=$(echo $STACK | jq -r '.[] | select(.OutputKey=="UserPoolClientId") | .OutputValue')" >> $GITHUB_OUTPUT
+          echo "cognito_domain=$(echo $STACK | jq -r '.[] | select(.OutputKey=="CognitoDomain") | .OutputValue')" >> $GITHUB_OUTPUT
+
+      - name: Build frontend
+        run: npm run build --workspace=frontend
+        env:
+          VITE_GITHUB_CLIENT_ID: ${{ secrets.GH_CLIENT_ID_DEV }}
+          VITE_JIRA_CLIENT_ID: ${{ secrets.JIRA_CLIENT_ID_DEV }}
+          VITE_COGNITO_USER_POOL_ID: ${{ steps.outputs.outputs.user_pool_id }}
+          VITE_COGNITO_CLIENT_ID: ${{ steps.outputs.outputs.user_pool_client_id }}
+          VITE_COGNITO_DOMAIN: ${{ steps.outputs.outputs.cognito_domain }}
 
       - name: Sync frontend to S3
         run: aws s3 sync frontend/dist/ s3://${{ steps.outputs.outputs.bucket }}/ --delete
