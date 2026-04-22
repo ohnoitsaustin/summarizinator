@@ -41,7 +41,7 @@ export async function jiraExchangeCode(code: string, redirectUri: string): Promi
   }
 }
 
-export async function jiraRefreshToken(refreshToken: string): Promise<{ accessToken: string; expiresAt: string }> {
+export async function jiraRefreshToken(refreshToken: string): Promise<{ accessToken: string; refreshToken: string; expiresAt: string }> {
   const res = await fetch('https://auth.atlassian.com/oauth/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -53,9 +53,10 @@ export async function jiraRefreshToken(refreshToken: string): Promise<{ accessTo
     }),
   })
   if (!res.ok) throw new Error('Failed to refresh Jira token')
-  const data = await res.json() as { access_token: string; expires_in: number }
+  const data = await res.json() as { access_token: string; refresh_token: string; expires_in: number }
   return {
     accessToken: data.access_token,
+    refreshToken: data.refresh_token,
     expiresAt: new Date(Date.now() + data.expires_in * 1000).toISOString(),
   }
 }
@@ -115,7 +116,7 @@ export async function jiraFetchEvents(project: Project, connection: SourceConnec
   if (res.status === 401 && connection.refreshToken) {
     console.log('[jira] 401 on search, forcing token refresh')
     const refreshed = await jiraRefreshToken(connection.refreshToken)
-    freshConnection = { ...connection, accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt }
+    freshConnection = { ...connection, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: refreshed.expiresAt }
     res = await doJiraSearch(jiraCloudId, freshConnection.accessToken, jql)
   }
 

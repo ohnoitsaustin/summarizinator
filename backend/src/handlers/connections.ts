@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
 import { getSourceConnection, listSourceConnections, upsertSourceConnection, deleteSourceConnection } from '../lib/dynamo'
-import { jiraExchangeCode } from '../lib/adapters/jira'
+import { jiraExchangeCode, jiraRefreshToken } from '../lib/adapters/jira'
 
 const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID!
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET!
@@ -120,16 +120,30 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     }
 
     if (route === 'GET /api/connections/jira/projects') {
-      const conn = await getSourceConnection(userId, 'jira')
+      let conn = await getSourceConnection(userId, 'jira')
       if (!conn) return err(400, 'Jira not connected')
+
+      const makeHeaders = (token: string) => ({ Authorization: `Bearer ${token}`, Accept: 'application/json' })
       const base = `https://api.atlassian.com/ex/jira/${conn.jiraCloudId}`
-      const headers = { Authorization: `Bearer ${conn.accessToken}`, Accept: 'application/json' }
 
       console.log('[jira/projects] cloudId:', conn.jiraCloudId)
 
+      const refreshIfNeeded = async (status: number): Promise<boolean> => {
+        if (status !== 401 || !conn!.refreshToken) return false
+        console.log('[jira/projects] 401, refreshing token')
+        const refreshed = await jiraRefreshToken(conn!.refreshToken)
+        conn = { ...conn!, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: refreshed.expiresAt }
+        await upsertSourceConnection(conn)
+        return true
+      }
+
       // Try paginated search first (v3)
-      const searchRes = await fetch(`${base}/rest/api/3/project/search?maxResults=100&orderBy=name`, { headers })
+      let searchRes = await fetch(`${base}/rest/api/3/project/search?maxResults=100&orderBy=name`, { headers: makeHeaders(conn.accessToken) })
       console.log('[jira/projects] search status:', searchRes.status)
+      if (searchRes.status === 401) {
+        const didRefresh = await refreshIfNeeded(searchRes.status)
+        if (didRefresh) searchRes = await fetch(`${base}/rest/api/3/project/search?maxResults=100&orderBy=name`, { headers: makeHeaders(conn.accessToken) })
+      }
       if (searchRes.ok) {
         const data = await searchRes.json() as { values?: Array<{ key: string; name: string }> }
         console.log('[jira/projects] search values count:', data.values?.length ?? 0)
@@ -140,7 +154,7 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
       }
 
       // Fallback: simple list endpoint (covers next-gen/team-managed projects)
-      const listRes = await fetch(`${base}/rest/api/3/project?maxResults=100`, { headers })
+      const listRes = await fetch(`${base}/rest/api/3/project?maxResults=100`, { headers: makeHeaders(conn.accessToken) })
       console.log('[jira/projects] list status:', listRes.status)
       if (!listRes.ok) {
         console.error('[jira/projects] list failed:', listRes.status, await listRes.text())
