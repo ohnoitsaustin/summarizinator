@@ -75,6 +75,7 @@ type JiraIssue = {
     summary: string
     description?: unknown
     status: { name: string }
+    issuetype?: { name: string }
     assignee?: { displayName: string } | null
     creator?: { displayName: string } | null
     reporter?: { displayName: string } | null
@@ -100,7 +101,7 @@ async function doJiraSearch(jiraCloudId: string, accessToken: string, jql: strin
     body: JSON.stringify({
       jql,
       maxResults: 100,
-      fields: ['summary', 'description', 'status', 'assignee', 'creator', 'reporter', 'created', 'updated', 'labels'],
+      fields: ['summary', 'description', 'status', 'issuetype', 'assignee', 'creator', 'reporter', 'created', 'updated', 'labels'],
     }),
   })
 }
@@ -133,6 +134,7 @@ export async function jiraFetchEvents(project: Project, connection: SourceConnec
     id: issue.key,
     source: 'jira' as const,
     type: mapJiraStatus(issue.fields.status.name),
+    sourceType: issue.fields.issuetype?.name.toLowerCase(),
     title: issue.fields.summary,
     description: extractText(issue.fields.description),
     actor: issue.fields.creator?.displayName ?? issue.fields.reporter?.displayName,

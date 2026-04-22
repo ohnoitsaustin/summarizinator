@@ -9,6 +9,10 @@ const TYPE_PRIORITY: Record<Event['type'], number> = {
   updated:     4,
 }
 
+function formatSourceType(t: string): string {
+  return t === 'pull_request' ? 'PR' : t
+}
+
 function eventActor(e: Event): string {
   return e.actor ?? e.assignee ?? '?'
 }
@@ -152,6 +156,7 @@ function EventRow({ event, hiddenIds, highlightedIds, hiddenAuthors, highlighted
       </div>
       <div className="flex items-center gap-2 mt-1">
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_COLORS[event.type]}`}>{TYPE_LABELS[event.type]}</span>
+        {event.sourceType && <span className="text-xs text-brand-light/50">{formatSourceType(event.sourceType)}</span>}
         {actor !== '?' && <span className="text-xs text-brand-light">@{actor}</span>}
         {event.assignee && event.actor && event.assignee !== event.actor && (
           <span className="text-xs text-brand-light/50">→ {event.assignee}</span>
@@ -196,7 +201,7 @@ export default function EventList({
   onBulkHide,
 }: Props) {
   const dragRef = useRef<DragState | null>(null)
-  const [showOverflow, setShowOverflow] = useState(false)
+  const [showAllAuthors, setShowAllAuthors] = useState(false)
   const [search, setSearch] = useState('')
   const [expandedTypes, setExpandedTypes] = useState<Set<Event['type']>>(new Set())
 
@@ -289,21 +294,17 @@ export default function EventList({
       <p className="text-brand-light text-xs">{authors.length} contributor{authors.length !== 1 ? 's' : ''} over {days} days</p>
 
       {/* Author filter bar */}
-      <div className="relative" onMouseEnter={() => setShowOverflow(true)} onMouseLeave={() => setShowOverflow(false)}>
-        <div className="flex flex-wrap gap-2">
-          {visibleAuthors.map(author => <AuthorChip key={author} author={author} count={authorCounts.get(author)!} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} onToggleHide={onToggleHideAuthor} onToggleHighlight={onToggleHighlightAuthor} />)}
-          {overflowAuthors.length > 0 && (
-            <button className="px-2.5 py-1 rounded-full border border-brand-light/40 bg-brand-surface/30 text-xs text-brand-light hover:text-brand-accent transition-colors">
-              +{overflowAuthors.length} more
-            </button>
-          )}
-        </div>
-        {showOverflow && overflowAuthors.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-20 pt-1">
-            <div className="bg-brand-bg border border-brand-light/30 rounded-lg p-3 flex flex-wrap gap-2 shadow-lg">
-              {overflowAuthors.map(author => <AuthorChip key={author} author={author} count={authorCounts.get(author)!} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} onToggleHide={onToggleHideAuthor} onToggleHighlight={onToggleHighlightAuthor} />)}
-            </div>
-          </div>
+      <div className="flex flex-wrap gap-2">
+        {(showAllAuthors ? authors : visibleAuthors).map(author => <AuthorChip key={author} author={author} count={authorCounts.get(author)!} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} onToggleHide={onToggleHideAuthor} onToggleHighlight={onToggleHighlightAuthor} />)}
+        {!showAllAuthors && overflowAuthors.length > 0 && (
+          <button onClick={() => setShowAllAuthors(true)} className="px-2.5 py-1 rounded-full border border-brand-light/40 bg-brand-surface/30 text-xs text-brand-light hover:text-brand-accent transition-colors">
+            +{overflowAuthors.length} more
+          </button>
+        )}
+        {showAllAuthors && overflowAuthors.length > 0 && (
+          <button onClick={() => setShowAllAuthors(false)} className="px-2.5 py-1 rounded-full border border-brand-light/40 bg-brand-surface/30 text-xs text-brand-light hover:text-brand-accent transition-colors">
+            show less
+          </button>
         )}
       </div>
 
@@ -349,7 +350,7 @@ export default function EventList({
                   const typeIds = eventsRef.current.filter(e => e.type === type).map(e => e.id)
                   const expanded = expandedTypes.has(type)
                   const shown = expanded ? evts : evts.slice(0, DEFAULT_PER_TYPE)
-                  const hiddenCount = evts.length - shown.length
+                  const overflowCount = evts.length - DEFAULT_PER_TYPE
                   const typeHL = typeIds.length > 0 && typeIds.every((id: string) => highlightedIds.has(id))
                   const typeHid = typeIds.length > 0 && typeIds.every((id: string) => hiddenIds.has(id))
                   return [
@@ -361,9 +362,14 @@ export default function EventList({
                       </div>
                     </div>,
                     ...shown.map(event => <EventRow key={event.id} event={event} hiddenIds={hiddenIds} highlightedIds={highlightedIds} hiddenAuthors={hiddenAuthors} highlightedAuthors={highlightedAuthors} itemRefs={itemRefs} startDrag={startDrag} enterDrag={enterDrag} />),
-                    ...(hiddenCount > 0 ? [
+                    ...(!expanded && overflowCount > 0 ? [
                       <button key={`expand-${type}`} onClick={() => setExpandedTypes(prev => { const next = new Set(prev); next.add(type); return next })} className="text-xs text-brand-light/50 hover:text-brand-accent transition-colors pl-1 py-0.5">
-                        show all
+                        show {overflowCount} more
+                      </button>
+                    ] : []),
+                    ...(expanded && overflowCount > 0 ? [
+                      <button key={`collapse-${type}`} onClick={() => setExpandedTypes(prev => { const next = new Set(prev); next.delete(type); return next })} className="text-xs text-brand-light/50 hover:text-brand-accent transition-colors pl-1 py-0.5">
+                        show less
                       </button>
                     ] : []),
                   ]

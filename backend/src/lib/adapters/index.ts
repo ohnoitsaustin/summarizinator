@@ -8,7 +8,7 @@ async function maybeRefreshJira(conn: SourceConnection): Promise<SourceConnectio
   // Refresh if token expires within 5 minutes
   if (new Date(conn.expiresAt).getTime() - Date.now() > 5 * 60 * 1000) return conn
   const refreshed = await jiraRefreshToken(conn.refreshToken)
-  const updated: SourceConnection = { ...conn, accessToken: refreshed.accessToken, expiresAt: refreshed.expiresAt }
+  const updated: SourceConnection = { ...conn, accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, expiresAt: refreshed.expiresAt }
   await upsertSourceConnection(updated)
   return updated
 }

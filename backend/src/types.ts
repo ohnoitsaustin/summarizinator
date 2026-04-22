@@ -41,6 +41,7 @@ export type Event = {
   id: string
   source: 'github' | 'jira'
   type: 'completed' | 'created' | 'in_progress' | 'updated' | 'blocked'
+  sourceType?: string
   title: string
   description?: string
   actor?: string
@@ -52,6 +53,10 @@ export type Event = {
   url?: string
   highlighted?: boolean
 }
+
+export type RateLimitResult =
+  | { allowed: true }
+  | { allowed: false; limitType: '10min' | '1hr' | '24hr'; retryAfterSeconds: number }
 
 // Internal type used only by the GitHub adapter
 export type GithubEvent = {

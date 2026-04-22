@@ -140,6 +140,33 @@ export async function patchProject(
   }))
 }
 
+export async function queryGenerationLogs(userId: string): Promise<string[]> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const res = await client.send(new QueryCommand({
+    TableName: TABLE,
+    KeyConditionExpression: 'PK = :pk AND SK BETWEEN :start AND :end',
+    ExpressionAttributeValues: {
+      ':pk': `USER#${userId}`,
+      ':start': `GENLOG#${since}`,
+      ':end': 'GENLOG#~',
+    },
+  }))
+  return (res.Items ?? []).map(item => (item.SK as string).slice('GENLOG#'.length))
+}
+
+export async function recordGenerationLog(userId: string): Promise<void> {
+  const now = new Date().toISOString()
+  const ttlSeconds = Math.floor(Date.now() / 1000) + 24 * 60 * 60
+  await client.send(new PutCommand({
+    TableName: TABLE,
+    Item: {
+      PK: `USER#${userId}`,
+      SK: `GENLOG#${now}`,
+      ttl: ttlSeconds,
+    },
+  }))
+}
+
 export async function createUpdate(update: Update): Promise<void> {
   await client.send(new PutCommand({
     TableName: TABLE,

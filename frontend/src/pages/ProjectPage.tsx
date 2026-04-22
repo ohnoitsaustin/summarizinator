@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
-import { api, type Project, type UpdateSummary, type AudienceMode } from '../api/client'
+import { api, RateLimitError, type Project, type UpdateSummary, type AudienceMode } from '../api/client'
 import GenerateButton from '../components/GenerateButton'
 import UpdateEditor from '../components/UpdateEditor'
 import EventList from '../components/EventList'
@@ -13,6 +13,16 @@ const AUDIENCE_OPTIONS: { value: AudienceMode; label: string }[] = [
   { value: 'product', label: 'Product' },
   { value: 'executive', label: 'Executive' },
 ]
+
+function formatRetryTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  if (mins < 60) return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`
+  const hrs = Math.floor(mins / 60)
+  const remMins = mins % 60
+  return remMins > 0 ? `${hrs}h ${remMins}m` : `${hrs}h`
+}
 
 function defaultSaveName(): string {
   const now = new Date()
@@ -212,7 +222,13 @@ export default function ProjectPage() {
       setActiveContent(result.content)
       setActiveEvents(result.events)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed')
+      if (e instanceof RateLimitError) {
+        const when = formatRetryTime(e.retryAfterSeconds)
+        const window = e.limitType === '10min' ? '10-minute' : e.limitType === '1hr' ? 'hourly' : 'daily'
+        setError(`You've hit the ${window} limit. You can generate again in ${when}.`)
+      } else {
+        setError(e instanceof Error ? e.message : 'Generation failed')
+      }
     } finally {
       setGenerating(false)
     }

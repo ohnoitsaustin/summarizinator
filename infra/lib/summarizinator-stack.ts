@@ -46,6 +46,7 @@ export class SummarizinatorStack extends cdk.Stack {
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'ttl',
     })
 
     table.addGlobalSecondaryIndex({

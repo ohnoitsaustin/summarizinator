@@ -9,6 +9,16 @@ async function getToken(): Promise<string | null> {
   }
 }
 
+export class RateLimitError extends Error {
+  retryAfterSeconds: number
+  limitType: '10min' | '1hr' | '24hr'
+  constructor(retryAfterSeconds: number, limitType: '10min' | '1hr' | '24hr') {
+    super('Rate limit exceeded')
+    this.retryAfterSeconds = retryAfterSeconds
+    this.limitType = limitType
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken()
   const res = await fetch(path, {
@@ -20,8 +30,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     },
   })
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`)
+    const body = await res.json().catch(() => ({})) as { message?: string; retryAfterSeconds?: number; limitType?: string }
+    if (res.status === 429 && typeof body.retryAfterSeconds === 'number' && (body.limitType === '10min' || body.limitType === '1hr' || body.limitType === '24hr')) {
+      throw new RateLimitError(body.retryAfterSeconds, body.limitType)
+    }
+    throw new Error(body.message ?? `HTTP ${res.status}`)
   }
   return res.json() as Promise<T>
 }
@@ -45,6 +58,7 @@ export type Event = {
   id: string
   source: 'github' | 'jira'
   type: 'completed' | 'created' | 'in_progress' | 'updated' | 'blocked'
+  sourceType?: string
   title: string
   description?: string
   actor?: string

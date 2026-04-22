@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto'
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from 'aws-lambda'
-import { getProject, getSourceConnection, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent } from '../lib/dynamo'
-import type { Event, AudienceMode } from '../types'
+import { getProject, getSourceConnection, getUpdatesByProject, createUpdate, deleteUpdate, patchUpdateContent, queryGenerationLogs, recordGenerationLog } from '../lib/dynamo'
+import type { Event, AudienceMode, RateLimitResult } from '../types'
 import { fetchEvents } from '../lib/adapters'
 import { preprocessEvents } from '../lib/preprocessing'
 import { generateUpdate } from '../lib/bedrock'
@@ -26,6 +26,27 @@ const err = (status: number, message: string): APIGatewayProxyResultV2 => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ message }),
 })
+
+const RATE_LIMITS = [
+  { limitType: '10min', windowMs: 10 * 60 * 1000, limit: 5 },
+  { limitType: '1hr',   windowMs: 60 * 60 * 1000, limit: 10 },
+  { limitType: '24hr',  windowMs: 24 * 60 * 60 * 1000, limit: 20 },
+] as const
+
+async function checkRateLimit(userId: string): Promise<RateLimitResult> {
+  const logs = await queryGenerationLogs(userId)
+  const now = Date.now()
+  for (const { limitType, windowMs, limit } of RATE_LIMITS) {
+    const windowStart = now - windowMs
+    const inWindow = logs.filter(ts => new Date(ts).getTime() >= windowStart)
+    if (inWindow.length >= limit) {
+      const oldest = inWindow.reduce((min, ts) => new Date(ts).getTime() < new Date(min).getTime() ? ts : min)
+      const retryAfterSeconds = Math.ceil((new Date(oldest).getTime() + windowMs - now) / 1000)
+      return { allowed: false, limitType, retryAfterSeconds }
+    }
+  }
+  return { allowed: true }
+}
 
 function getUserId(event: APIGatewayProxyEventV2): string | null {
   const ctx = event.requestContext as unknown as {
@@ -55,6 +76,15 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   }
   if (!body.projectId) return err(400, 'Missing projectId')
 
+  const rateLimit = await checkRateLimit(userId)
+  if (!rateLimit.allowed) {
+    return {
+      statusCode: 429,
+      headers: { 'Content-Type': 'application/json', 'Retry-After': String(rateLimit.retryAfterSeconds) },
+      body: JSON.stringify({ message: 'Rate limit exceeded', retryAfterSeconds: rateLimit.retryAfterSeconds, limitType: rateLimit.limitType }),
+    }
+  }
+
   const project = await getProject(userId, body.projectId)
   if (!project) return err(404, 'Project not found')
 
@@ -77,6 +107,7 @@ async function handleGenerate(event: APIGatewayProxyEventV2, userId: string): Pr
   const signals = analyzeRisks(events, context)
   const content = await generateUpdate(events, days, audience, context, signals)
 
+  await recordGenerationLog(userId)
   return ok({ content, events, audience, generationContext: context })
 }
 

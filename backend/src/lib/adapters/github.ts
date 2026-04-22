@@ -12,6 +12,17 @@ function mapGithubType(type: GithubEvent['type']): Event['type'] {
   }
 }
 
+function mapGithubSourceType(type: GithubEvent['type']): string {
+  switch (type) {
+    case 'pr_opened':
+    case 'pr_merged':    return 'pull_request'
+    case 'commit':       return 'commit'
+    case 'issue_opened':
+    case 'issue_closed': return 'issue'
+    case 'release':      return 'release'
+  }
+}
+
 export async function githubFetchEvents(project: Project, days: number, token: string): Promise<Event[]> {
   const { repoOwner, repoName } = project.sourceConfig
   if (!repoOwner || !repoName) throw new Error('GitHub project missing repoOwner/repoName')
@@ -21,6 +32,7 @@ export async function githubFetchEvents(project: Project, days: number, token: s
     id: e.id,
     source: 'github' as const,
     type: mapGithubType(e.type),
+    sourceType: mapGithubSourceType(e.type),
     title: e.title,
     description: e.body,
     actor: e.author,
